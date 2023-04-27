@@ -1,0 +1,47 @@
+{
+  "name": "ical-browser",
+  "version": "0.0.1",
+  "description": "Browser iCalendar generator",
+  "module": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "prebuild": "rm -rf dist",
+    "build": "tsc --build",
+    "test": "node test/index.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qertis/ical-browser.git"
+  },
+  "keywords": [
+    "ical",
+    "ical.ts",
+    "ics",
+    "calendar",
+    "icalendar",
+    "iCalendar 2.0",
+    "apple calendar",
+    "generator",
+    "rfc5545",
+    "events",
+    "alarms",
+    "todo",
+    "journal"
+  ],
+  "author": "Denis Baskovsky <baskovsky@ya.ru> (https://baskovsky.ru)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/qertis/ical-browser/issues"
+  },
+  "engines": {
+    "node": ">=16.x"
+  },
+  "files": [
+    "/dist"
+  ],
+  "homepage": "https://github.com/qertis/ical-browser#readme",
+  "devDependencies": {
+    "typescript": "^5.x"
+  }
+}
