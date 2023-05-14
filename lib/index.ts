@@ -1,3 +1,4 @@
+import mime from 'mime-types'
 import { Event, Todo, Journal, Alarm } from './types'
 
 const BR = '\r\n'
@@ -113,6 +114,7 @@ function createAttach(base64: string) {
 
   let str = 'ATTACH'
   str += ';FMTTYPE=' + type
+  str += ';FILENAME=' + globalThis.crypto.randomUUID() + '.' + mime.extension(type)
   str += ';ENCODING=' + encoding.toUpperCase()
   str += ';VALUE=' + 'BINARY'
   str += ':' + data

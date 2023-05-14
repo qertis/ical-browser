@@ -1,6 +1,6 @@
 {
   "name": "ical-browser",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Browser iCalendar generator",
   "module": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -42,6 +42,10 @@
   ],
   "homepage": "https://github.com/qertis/ical-browser#readme",
   "devDependencies": {
+    "@types/mime-types": "^2.1.1",
     "typescript": "^5.x"
+  },
+  "dependencies": {
+    "mime-types": "^2.1.35"
   }
 }

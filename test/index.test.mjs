@@ -27,6 +27,7 @@ test('icalendar', (t) => {
     url: new URL('https://baskovsky.ru#example'),
   })
   assert.ok(event.length > 0)
+  assert.ok(event.includes('.gif;'))
 
   const todo = createTodo({
     uid,
