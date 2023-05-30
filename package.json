@@ -1,6 +1,6 @@
 {
   "name": "ical-browser",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Browser iCalendar generator",
   "module": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -8,7 +8,8 @@
   "scripts": {
     "prebuild": "rm -rf dist",
     "build": "tsc --build",
-    "test": "node test/index.test.mjs"
+    "test": "node test/index.test.mjs",
+    "prepublish": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -16,14 +17,12 @@
   },
   "keywords": [
     "ical",
-    "ical.ts",
+    "ical browser",
+    "rfc5545",
     "ics",
-    "calendar",
-    "icalendar",
+    "icalendar typescript",
     "iCalendar 2.0",
     "apple calendar",
-    "generator",
-    "rfc5545",
     "events",
     "alarms",
     "todo",
