@@ -3,7 +3,7 @@ import { Event, Todo, Journal, Alarm } from './types'
 
 const BR = '\r\n'
 
-// конвертация даты в стандарт Date UTC Time
+// Date conversion to Date UTC Time standard
 function dateWithUTCTime(now: Date) {
   const year = now.getUTCFullYear()
   const month = (now.getUTCMonth() + 1).toString().padStart(2, '0')
@@ -15,7 +15,7 @@ function dateWithUTCTime(now: Date) {
   return `${year}${month}${day}T${hours}${minutes}${seconds}Z`
 }
 
-// разрезаем строки которые больше 75 символов на несколько строк
+// Split strings that are more than 75 characters into multiple lines
 function unfolding(str: string, maxLimit = 75) {
   const length = str.length
   let outStr = ''
@@ -26,6 +26,26 @@ function unfolding(str: string, maxLimit = 75) {
     outStr += str.slice(i, i + maxLimit) + '\n' + ' '.repeat(j)
   }
   return outStr
+}
+
+function createEmail(str: string) {
+  const MAILTO = 'mailto:'
+  return str.startsWith(MAILTO) ? str : MAILTO + str
+}
+
+function createOrganizer(organizer: string | {name: string, email: string}[]) {
+  let str = ''
+  if (Array.isArray(organizer)) {
+    for (const address of organizer) {
+      let org = 'ORGANIZER;'
+      org += 'CN=' + address.name
+      org += `:${createEmail(address.email)}`
+      str += org + BR
+    }
+  } else {
+    str += `ORGANIZER;${organizer}` + BR
+  }
+  return str
 }
 
 export function event({
@@ -69,32 +89,20 @@ export function event({
   if (categories) {
     str += `CATEGORIES:${categories}` + BR
   }
-  if (Array.isArray(organizer)) {
-    for (const address of organizer) {
-      let org = 'ORGANIZER;'
-      org += 'CN=' + address.name
-      org += ':mailto:' + address.email
-      str += org + BR
-    }
-  } else if (typeof organizer === 'string') {
-    str += `ORGANIZER;${organizer}` + BR
+  if (organizer) {
+    str += createOrganizer(organizer)
   }
-  if (Array.isArray(attendee)) {
-    for (const address of attendee) {
-      let org = 'ORGANIZER;'
-      org += 'CN=' + address.name
-      org += ':mailto:' + address.email
-      str += org + BR
-    }
-  } else if (typeof attendee === 'string') {
-    str += `ATTENDEE;${attendee}` + BR
+  if (attendee) {
+    str += createOrganizer(attendee)
   }
-  if (Array.isArray(attach)) {
-    for (const base64 of attach) {
-      str += createAttach(base64) + BR
+  if (attach) {
+    if (Array.isArray(attach)) {
+      for (const base64 of attach) {
+        str += createAttach(base64) + BR
+      }
+    } else {
+      str += createAttach(attach) + BR
     }
-  } else if (typeof attach === 'string') {
-    str += createAttach(attach) + BR
   }
   if (url) {
     str += createUri(url) + BR
@@ -216,8 +224,7 @@ export default (
   str += 'END:VCALENDAR'
 
   const encoder = new TextEncoder()
-  const view = encoder.encode(str)
-  return new File([view], name + '.ics', {
+  return new File([encoder.encode(str)], name + '.ics', {
     type: 'text/calendar',
   })
 }
