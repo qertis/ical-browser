@@ -1,6 +1,6 @@
 {
   "name": "ical-browser",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Browser iCalendar generator",
   "module": "dist/index.js",
   "typings": "dist/index.d.ts",

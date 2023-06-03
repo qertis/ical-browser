@@ -39,7 +39,9 @@ function createOrganizer(organizer: string | {name: string, email: string}[]) {
     for (const address of organizer) {
       let org = 'ORGANIZER;'
       org += 'CN=' + address.name
-      org += `:${createEmail(address.email)}`
+      if (address.email) {
+        org += `:${createEmail(address.email)}`
+      }
       str += org + BR
     }
   } else {
