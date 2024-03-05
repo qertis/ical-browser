@@ -6,6 +6,7 @@ export type Address = {
 export interface Event {
   uid: string
   location?: string
+  geo?: number[]
   summary?: string
   description?: string
   stamp?: Date

@@ -53,6 +53,7 @@ function createOrganizer(organizer: string | {name: string, email: string}[]) {
 export function event({
   uid,
   location,
+  geo,
   summary,
   description,
   stamp,
@@ -67,25 +68,28 @@ export function event({
 }: Event) {
   let str = 'BEGIN:VEVENT' + BR
   str += `UID:${uid}` + BR
-  if (stamp) {
+  if (stamp instanceof Date) {
     str += `DTSTAMP:${dateWithUTCTime(stamp)}` + BR
   }
-  if (start) {
+  if (start instanceof Date) {
     str += `DTSTART:${dateWithUTCTime(start)}` + BR
   }
-  if (end) {
+  if (end instanceof Date) {
     str += `DTEND:${dateWithUTCTime(end)}` + BR
   }
-  if (location) {
+  if (location?.length) {
     str += `LOCATION:${location}` + BR
   }
-  if (summary) {
+  if (geo && Array.isArray(geo)) {
+    str += `GEO:${geo[0]};${geo[1]}` + BR
+  }
+  if (summary?.length) {
     str += `SUMMARY:${unfolding(summary)}` + BR
   }
-  if (description) {
+  if (description?.length) {
     str += `DESCRIPTION:${unfolding(description)}` + BR
   }
-  if (status) {
+  if (status?.length) {
     str += `STATUS:${status}` + BR
   }
   if (categories) {
@@ -106,7 +110,7 @@ export function event({
       str += createAttach(attach) + BR
     }
   }
-  if (url) {
+  if (url && url instanceof URL) {
     str += createUri(url) + BR
   }
   str += 'END:VEVENT'
@@ -143,16 +147,16 @@ export function todo({
 }: Todo) {
   let str = 'BEGIN:VTODO' + BR
   str += 'UID:' + uid + BR
-  if (stamp) {
+  if (stamp instanceof Date) {
     str += `DTSTAMP:${dateWithUTCTime(stamp)}` + BR
   }
-  if (due) {
+  if (due instanceof Date) {
     str += `DTSTAMP:${dateWithUTCTime(due)}` + BR
   }
-  if (summary) {
+  if (summary?.length) {
     str += 'SUMMARY:' + unfolding(summary) + BR
   }
-  if (description) {
+  if (description?.length) {
     str += 'DESCRIPTION:' + unfolding(description) + BR
   }
   if (priority) {
@@ -169,16 +173,16 @@ export function todo({
 export function journal({ uid, stamp, start, summary, description }: Journal) {
   let str = 'BEGIN:VJOURNAL'
   str += `UID:${uid}` + BR
-  if (stamp) {
+  if (stamp instanceof Date) {
     str += `DTSTAMP:${dateWithUTCTime(stamp)}` + BR
   }
-  if (start) {
+  if (start instanceof Date) {
     str += `DTSTART:${dateWithUTCTime(start)}` + BR
   }
-  if (summary) {
+  if (summary?.length) {
     str += `SUMMARY:${unfolding(summary)}` + BR
   }
-  if (description) {
+  if (description?.length) {
     str += `DESCRIPTION:${unfolding(description)}` + BR
   }
   str += 'END:VJOURNAL'
@@ -189,9 +193,15 @@ export function journal({ uid, stamp, start, summary, description }: Journal) {
 export function alarm({ uid, action, description, trigger }: Alarm) {
   let str = 'BEGIN:VALARM' + BR
   str += 'UID:' + uid + BR
-  str += 'TRIGGER:' + trigger + BR
-  str += 'DESCRIPTION:' + description + BR
-  str += 'ACTION:' + action + BR
+  if (trigger) {
+    str += 'TRIGGER:' + trigger + BR
+  }
+  if (description) {
+    str += 'DESCRIPTION:' + description + BR
+  }
+  if (action) {
+    str += 'ACTION:' + action + BR
+  }
   str += 'END:VALARM'
 
   return str

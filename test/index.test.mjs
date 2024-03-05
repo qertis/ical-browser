@@ -14,11 +14,12 @@ test('icalendar', (t) => {
   const event = createEvent({
     uid,
     location: 'Online',
+    geo: [37.5739497,-85.7399606],
     summary: 'Event summary',
     description: 'Event description',
     stamp: new Date(),
-    start: new Date(),
-    end: new Date(),
+    start: new Date('2024-01-01T10:10:00.611Z'),
+    end: new Date('2024-01-02T10:12:00.611Z'),
     attach: [
       'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEAAAAACwAAAAAAQABAAACAkQBADs='
     ],
@@ -27,6 +28,7 @@ test('icalendar', (t) => {
     url: new URL('https://baskovsky.ru#example'),
   })
   assert.ok(event.length > 0)
+  assert.ok(event.includes('GEO:37.5739497;-85.7399606'))
   assert.ok(event.includes('.gif;'))
 
   const todo = createTodo({

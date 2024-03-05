@@ -1,6 +1,6 @@
 {
   "name": "ical-browser",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Browser iCalendar generator",
   "module": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -8,6 +8,7 @@
   "scripts": {
     "prebuild": "rm -rf dist",
     "build": "tsc --build",
+    "watch": "tsc --watch",
     "test": "node test/index.test.mjs",
     "prepublish": "npm run build"
   },
@@ -34,15 +35,15 @@
     "url": "https://github.com/qertis/ical-browser/issues"
   },
   "engines": {
-    "node": ">=16.x"
+    "node": ">=18.x"
   },
   "files": [
     "/dist"
   ],
   "homepage": "https://github.com/qertis/ical-browser#readme",
   "devDependencies": {
-    "@types/mime-types": "^2.1.1",
-    "typescript": "^5.x"
+    "@types/mime-types": "^2.1.4",
+    "typescript": "^5.3.3"
   },
   "dependencies": {
     "mime-types": "^2.1.35"
