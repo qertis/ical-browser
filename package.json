@@ -1,15 +1,24 @@
 {
   "name": "ical-browser",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Browser and Node iCalendar Generator",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
-  "typings": "dist/index.d.ts",
+  "source": "lib/index.ts",
+  "typings": "dist/types/types.d.ts",
+  "exports": {
+    ".": {
+      "node": "dist/esm/index.js",
+      "require": "dist/cjs/index.js",
+      "import": "dist/esm/index.mjs"
+    }
+  },
   "scripts": {
     "prebuild": "rm -rf dist",
-    "build": "tsc --build ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json",
+    "build": "tsc --build ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json ; mv dist/esm/index.js dist/esm/index.mjs",
     "watch": "tsc --watch",
     "test": "node test/index.test.mjs",
+    "test:cjs": "node test/index.test.cjs",
     "prepublish": "npm run build"
   },
   "repository": {

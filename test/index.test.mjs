@@ -6,7 +6,7 @@ import {
   journal as createJournal,
   alarm as createAlarm,
   default as icalendar,
-} from '../dist/esm/index.js'
+} from '../dist/esm/index.mjs'
 
 test('icalendar', () => {
   const uid = '1234567890'
