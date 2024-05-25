@@ -5,7 +5,6 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "outDir": "./dist",
-    "module": "ES2022",
     "removeComments": true,
     "strict": true,
     "target": "esnext"

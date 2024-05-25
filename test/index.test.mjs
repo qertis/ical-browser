@@ -6,9 +6,9 @@ import {
   journal as createJournal,
   alarm as createAlarm,
   default as icalendar,
-} from '../dist/index.js'
+} from '../dist/esm/index.js'
 
-test('icalendar', (t) => {
+test('icalendar', () => {
   const uid = '1234567890'
 
   const event = createEvent({
