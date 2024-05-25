@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const ical = require('../dist/cjs/index.js')
+const ical = require('../dist/cjs/index.cjs')
 
 test('icalendar', () => {
   assert.ok(ical.todo)

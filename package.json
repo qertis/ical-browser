@@ -1,6 +1,6 @@
 {
   "name": "ical-browser",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Browser and Node iCalendar Generator",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -8,14 +8,13 @@
   "typings": "dist/types/types.d.ts",
   "exports": {
     ".": {
-      "node": "dist/esm/index.js",
-      "require": "dist/cjs/index.js",
-      "import": "dist/esm/index.mjs"
+      "require": "./dist/cjs/index.cjs",
+      "import": "./dist/esm/index.mjs"
     }
   },
   "scripts": {
     "prebuild": "rm -rf dist",
-    "build": "tsc --build ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json ; mv dist/esm/index.js dist/esm/index.mjs",
+    "build": "tsc --build ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json ; mv dist/esm/index.js dist/esm/index.mjs ; mv dist/cjs/index.js dist/cjs/index.cjs",
     "watch": "tsc --watch",
     "test": "node test/index.test.mjs",
     "test:cjs": "node test/index.test.cjs",
@@ -31,7 +30,6 @@
     "ical node",
     "rfc5545",
     "ics",
-    "icalendar typescript",
     "iCalendar 2.0",
     "apple calendar format",
     "calendar events",
