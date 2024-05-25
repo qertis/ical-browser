@@ -1,11 +1,10 @@
 {
   "name": "ical-browser",
-  "version": "0.0.7",
-  "description": "Browser iCalendar generator",
+  "version": "0.0.8",
+  "description": "Browser and Node iCalendar Generator",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "typings": "dist/index.d.ts",
-  "type": "module",
   "scripts": {
     "prebuild": "rm -rf dist",
     "build": "tsc --build ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json",
@@ -20,15 +19,16 @@
   "keywords": [
     "ical",
     "ical browser",
+    "ical node",
     "rfc5545",
     "ics",
     "icalendar typescript",
     "iCalendar 2.0",
-    "apple calendar",
-    "events",
-    "alarms",
-    "todo",
-    "journal"
+    "apple calendar format",
+    "calendar events",
+    "calendar alarms",
+    "calendar todo",
+    "calendar journal"
   ],
   "author": "Denis Baskovsky <baskovsky@ya.ru> (https://baskovsky.ru)",
   "license": "MIT",
