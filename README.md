@@ -1,9 +1,16 @@
-### Installation
+# ical-browser
+
+## Installation
+
 ```bash
 npm install ical-browser
 ```
 
-### Quick Start
+## DEMO
+https://codepen.io/qertis/full/RweggQJ
+
+## Quick Start
+
 ```js
 import { event as createEvent, default as ical } from 'ical-browser'
 const myEvent = createEvent({
@@ -12,11 +19,12 @@ const myEvent = createEvent({
   description: 'My event',
   start: new Date(),
 })
-const file = ical('id', 'calendar', myEvent)
+const str = ical('id', myEvent)
+const file = new File([new TextEncoder().encode(str)], 'calendar.ics', {
+  type: 'text/calendar',
+})
 ```
 
-### DEMO
-https://codepen.io/qertis/full/RweggQJ
+## Copyright and license
 
-### Copyright and license
 Copyright (c) Denis Baskovsky under the MIT license.

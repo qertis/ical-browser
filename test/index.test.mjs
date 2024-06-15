@@ -59,8 +59,14 @@ test('icalendar', () => {
   })
   assert.ok(alarm.length > 0)
 
-  const icsFile = icalendar('test', 'calendar', event, todo, journal, alarm)
-
-  assert.equal(icsFile.type, 'text/calendar')
-  assert.ok(icsFile.name.endsWith('.ics'))
+  const ics = icalendar('test', { event, todo, journal, alarm })
+  assert.ok(ics.includes('BEGIN:VCALENDAR'))
+  assert.ok(ics.includes('BEGIN:VEVENT'))
+  assert.ok(ics.includes('END:VEVENT'))
+  assert.ok(ics.includes('BEGIN:VTODO'))
+  assert.ok(ics.includes('END:VTODO'))
+  assert.ok(ics.includes('BEGIN:VJOURNALUID:1234567890'))
+  assert.ok(ics.includes('END:VJOURNAL'))
+  assert.ok(ics.includes('BEGIN:VALARM'))
+  assert.ok(ics.includes('END:VCALENDAR'))
 });

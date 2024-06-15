@@ -1,11 +1,12 @@
 {
   "name": "ical-browser",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Browser and Node iCalendar Generator",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "source": "lib/index.ts",
   "typings": "dist/types/types.d.ts",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
       "require": "./dist/cjs/index.cjs",
@@ -43,7 +44,7 @@
     "url": "https://github.com/qertis/ical-browser/issues"
   },
   "engines": {
-    "node": ">=18.x"
+    "node": ">=20.x"
   },
   "files": [
     "/dist"

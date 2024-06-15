@@ -209,11 +209,7 @@ export function alarm({ uid, action, description, trigger }: Alarm) {
 
 export default (
   id: string,
-  name: string,
-  event?: string,
-  todo?: string,
-  journal?: string,
-  alarm?: string,
+  { event, todo, journal, alarm, }: { event?: string, todo?: string, journal?: string, alarm?: string }
 ) => {
   let str = 'BEGIN:VCALENDAR' + BR
   str += 'VERSION:2.0' + BR
@@ -235,8 +231,5 @@ export default (
   }
   str += 'END:VCALENDAR'
 
-  const encoder = new TextEncoder()
-  return new File([encoder.encode(str)], name + '.ics', {
-    type: 'text/calendar',
-  })
+  return str as string
 }
