@@ -1,15 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import ICAL from 'ical.js'
 import {
   todo as createTodo,
   event as createEvent,
   journal as createJournal,
   alarm as createAlarm,
   default as icalendar,
-} from '../dist/esm/index.mjs'
+} from '../lib/index'
 
 test('icalendar', () => {
   const uid = '1234567890'
+  assert.ok(createTodo)
+  assert.ok(createEvent)
+  assert.ok(createJournal)
+  assert.ok(createAlarm)
 
   const event = createEvent({
     uid,
@@ -23,7 +28,7 @@ test('icalendar', () => {
     attach: [
       'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEAAAAACwAAAAAAQABAAACAkQBADs='
     ],
-    organizer: 'CN=Jane Doe:mailto:jane.doe@example.com',
+    organizer: 'Jane Doe',
     attendee: 'CN=John Smith:mailto:john.smith@example.com',
     url: new URL('https://baskovsky.ru#example'),
   })
@@ -69,4 +74,7 @@ test('icalendar', () => {
   assert.ok(ics.includes('END:VJOURNAL'))
   assert.ok(ics.includes('BEGIN:VALARM'))
   assert.ok(ics.includes('END:VCALENDAR'))
-});
+
+  const jcalData = ICAL.parse(ics)
+  assert.ok(Array.isArray(jcalData))
+})

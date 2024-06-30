@@ -45,7 +45,7 @@ function createOrganizer(organizer: string | {name: string, email: string}[]) {
       str += org + BR
     }
   } else {
-    str += `ORGANIZER;${organizer}` + BR
+    str += `ORGANIZER:${organizer}` + BR
   }
   return str
 }

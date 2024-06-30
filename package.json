@@ -1,6 +1,6 @@
 {
   "name": "ical-browser",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "Browser and Node iCalendar Generator",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -16,9 +16,8 @@
   "scripts": {
     "prebuild": "rm -rf dist",
     "build": "tsc --build ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json ; mv dist/esm/index.js dist/esm/index.mjs ; mv dist/cjs/index.js dist/cjs/index.cjs",
-    "watch": "tsc --watch",
-    "test": "node test/index.test.mjs",
-    "test:cjs": "node test/index.test.cjs",
+    "watch": "tsx watch lib/index.ts",
+    "test": "node --import tsx --test test/index.test.ts",
     "prepublish": "npm run build"
   },
   "repository": {
@@ -52,7 +51,9 @@
   "homepage": "https://github.com/qertis/ical-browser#readme",
   "devDependencies": {
     "@types/mime-types": "^2.1.4",
-    "typescript": "^5.4.5"
+    "ical.js": "^2.0.1",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.2"
   },
   "dependencies": {
     "mime-types": "^2.1.35"
