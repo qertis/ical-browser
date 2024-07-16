@@ -1,7 +1,7 @@
 {
   "name": "ical-browser",
-  "version": "0.0.12",
-  "description": "Browser and Node iCalendar Generator",
+  "version": "0.0.13",
+  "description": "NodeJS and Browser iCalendar file Generator",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "source": "lib/index.ts",

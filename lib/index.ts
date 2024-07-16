@@ -87,7 +87,7 @@ export function event({
     str += `SUMMARY:${unfolding(summary)}` + BR
   }
   if (description?.length) {
-    str += `DESCRIPTION:${unfolding(description)}` + BR
+    str += `DESCRIPTION:${(description)}` + BR
   }
   if (status?.length) {
     str += `STATUS:${status}` + BR
@@ -157,12 +157,12 @@ export function todo({
     str += 'SUMMARY:' + unfolding(summary) + BR
   }
   if (description?.length) {
-    str += 'DESCRIPTION:' + unfolding(description) + BR
+    str += 'DESCRIPTION:' + (description) + BR
   }
   if (priority) {
     str += 'PRIORITY:' + String(priority) + BR
   }
-  if (status) {
+  if (status?.length) {
     str += 'STATUS:' + status + BR
   }
   str += 'END:VTODO'
@@ -183,7 +183,7 @@ export function journal({ uid, stamp, start, summary, description }: Journal) {
     str += `SUMMARY:${unfolding(summary)}` + BR
   }
   if (description?.length) {
-    str += `DESCRIPTION:${unfolding(description)}` + BR
+    str += `DESCRIPTION:${(description)}` + BR
   }
   str += 'END:VJOURNAL'
 
@@ -196,7 +196,7 @@ export function alarm({ uid, action, description, trigger }: Alarm) {
   if (trigger) {
     str += 'TRIGGER:' + trigger + BR
   }
-  if (description) {
+  if (description?.length) {
     str += 'DESCRIPTION:' + description + BR
   }
   if (action) {

@@ -1,15 +1,17 @@
-# ical-browser
-
-## Installation
-
-```bash
-npm install ical-browser
-```
+# iCal Browser
 
 ## DEMO
 https://codepen.io/qertis/full/RweggQJ
 
 ## Quick Start
+
+### Installation
+
+```bash
+npm install ical-browser
+```
+
+### Example
 
 ```js
 import { event as createEvent, default as ical } from 'ical-browser'
