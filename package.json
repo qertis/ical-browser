@@ -1,6 +1,6 @@
 {
   "name": "ical-browser",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "NodeJS and Browser iCalendar file Generator",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -52,8 +52,8 @@
   "devDependencies": {
     "@types/mime-types": "^2.1.4",
     "ical.js": "^2.0.1",
-    "tsx": "^4.16.0",
-    "typescript": "^5.5.2"
+    "tsx": "^4.16.3",
+    "typescript": "^5.5.4"
   },
   "dependencies": {
     "mime-types": "^2.1.35"

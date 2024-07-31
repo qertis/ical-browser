@@ -3,6 +3,28 @@ export type Address = {
   email: string
 }
 
+export enum Day {
+  mo = 'MO',
+  tu = 'TU',
+  we = 'WE',
+  th = 'TH',
+  fr = 'FR',
+  sa = 'SA',
+  su = 'SU',
+}
+
+export type Rule = {
+  freq: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
+  count: number
+  interval: number
+  until: string
+  wkst: Day.mo | Day.su
+  byday: Day | Day[]
+  byweekno: number
+  bymonthday: number | number[]
+  byyearday: number
+}
+
 export interface Event {
   uid: string
   location?: string
@@ -18,6 +40,7 @@ export interface Event {
   url?: URL
   status?: 'TENTATIVE' | 'CONFIRMED' | 'CANCELLED'
   categories?: string
+  rrule?: Rule
 }
 
 export interface Todo {
@@ -28,6 +51,7 @@ export interface Todo {
   description?: string
   priority?: number
   status?: 'NEEDS-ACTION' | 'COMPLETED' | 'IN-PROCESS' | 'CANCELLED'
+  rrule?: Rule
 }
 
 export interface Journal {
@@ -36,6 +60,7 @@ export interface Journal {
   start?: Date
   summary?: string
   description?: string
+  rrule?: Rule
 }
 
 export interface Alarm {

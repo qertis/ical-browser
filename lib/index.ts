@@ -1,5 +1,5 @@
 import mime from 'mime-types'
-import { Event, Todo, Journal, Alarm } from './types'
+import { Event, Todo, Journal, Alarm, Rule, Day } from './types'
 
 const BR = '\r\n'
 
@@ -33,6 +33,58 @@ function createEmail(str: string) {
   return str.startsWith(MAILTO) ? str : MAILTO + str
 }
 
+function recurrenceRule({
+  freq,
+  interval,
+  count,
+  until,
+  wkst = Day.mo,
+  byday,
+  byweekno,
+  bymonthday,
+  byyearday,
+}: Rule) {
+  let outStr = ''
+  if (freq) {
+    outStr += 'FREQ=' + freq + ';'
+  }
+  if (interval) {
+    outStr += 'INTERVAL=' + interval + ';'
+  }
+  if (count) {
+    outStr += 'COUNT=' + count + ';'
+  }
+  if (until) {
+    outStr += 'UNTIL=' + until + ';'
+  }
+  outStr += wkst + ';'
+  if (byday) {
+    outStr += 'BYDAY='
+    if (Array.isArray(byday)) {
+      outStr += byday.join(',')
+    } else {
+      outStr += byday
+    }
+    outStr += ';'
+  }
+  if (byweekno) {
+    outStr += 'BYWEEKNO' + byweekno + ';'
+  }
+  if (bymonthday) {
+    outStr += 'BYMONTHDAY='
+    if (Array.isArray(bymonthday)) {
+      outStr += bymonthday.join(',')
+    } else {
+      outStr += bymonthday
+    }
+    outStr += ';'
+  }
+  if (byyearday) {
+    outStr += 'BYYEARDAY' + byyearday + ';'
+  }
+  return outStr
+}
+
 function createOrganizer(organizer: string | {name: string, email: string}[]) {
   let str = ''
   if (Array.isArray(organizer)) {
@@ -50,6 +102,23 @@ function createOrganizer(organizer: string | {name: string, email: string}[]) {
   return str
 }
 
+function createUri(url: URL) {
+  return 'URL;VALUE=URI:' + url.toString()
+}
+
+function createAttach(base64: string) {
+  const [type, temp] = base64.split('data:')[1].split(';')
+  const [encoding, data] = temp.split(',')
+
+  let str = 'ATTACH'
+  str += ';FMTTYPE=' + type
+  str += ';FILENAME=' + globalThis.crypto.randomUUID() + '.' + mime.extension(type)
+  str += ';ENCODING=' + encoding.toUpperCase()
+  str += ';VALUE=' + 'BINARY'
+  str += ':' + data
+
+  return str
+}
 export function event({
   uid,
   location,
@@ -65,6 +134,7 @@ export function event({
   url,
   status,
   categories,
+  rrule,
 }: Event) {
   let str = 'BEGIN:VEVENT' + BR
   str += `UID:${uid}` + BR
@@ -113,25 +183,10 @@ export function event({
   if (url && url instanceof URL) {
     str += createUri(url) + BR
   }
+  if (rrule) {
+    str += 'RRULE:' + recurrenceRule(rrule) + BR
+  }
   str += 'END:VEVENT'
-
-  return str
-}
-
-function createUri(url: URL) {
-  return 'URL;VALUE=URI:' + url.toString()
-}
-
-function createAttach(base64: string) {
-  const [type, temp] = base64.split('data:')[1].split(';')
-  const [encoding, data] = temp.split(',')
-
-  let str = 'ATTACH'
-  str += ';FMTTYPE=' + type
-  str += ';FILENAME=' + globalThis.crypto.randomUUID() + '.' + mime.extension(type)
-  str += ';ENCODING=' + encoding.toUpperCase()
-  str += ';VALUE=' + 'BINARY'
-  str += ':' + data
 
   return str
 }
@@ -144,6 +199,7 @@ export function todo({
   description,
   priority,
   status,
+  rrule,
 }: Todo) {
   let str = 'BEGIN:VTODO' + BR
   str += 'UID:' + uid + BR
@@ -165,12 +221,22 @@ export function todo({
   if (status?.length) {
     str += 'STATUS:' + status + BR
   }
+  if (rrule) {
+    str += 'RRULE:' + recurrenceRule(rrule) + BR
+  }
   str += 'END:VTODO'
 
   return str
 }
 
-export function journal({ uid, stamp, start, summary, description }: Journal) {
+export function journal({
+  uid,
+  stamp,
+  start,
+  summary,
+  description,
+  rrule,
+}: Journal) {
   let str = 'BEGIN:VJOURNAL'
   str += `UID:${uid}` + BR
   if (stamp instanceof Date) {
@@ -184,6 +250,9 @@ export function journal({ uid, stamp, start, summary, description }: Journal) {
   }
   if (description?.length) {
     str += `DESCRIPTION:${(description)}` + BR
+  }
+  if (rrule) {
+    str += 'RRULE:' + recurrenceRule(rrule) + BR
   }
   str += 'END:VJOURNAL'
 
