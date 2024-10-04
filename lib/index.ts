@@ -38,7 +38,7 @@ function recurrenceRule({
   interval,
   count,
   until,
-  wkst = Day.mo,
+  wkst = 'MO',
   byday,
   byweekno,
   bymonthday,

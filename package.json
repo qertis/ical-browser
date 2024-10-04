@@ -1,6 +1,6 @@
 {
   "name": "ical-browser",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "NodeJS and Browser iCalendar file Generator",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -25,13 +25,12 @@
     "url": "git+https://github.com/qertis/ical-browser.git"
   },
   "keywords": [
-    "ical",
+    "iCalendar 2.0",
     "ical browser",
     "ical node",
     "rfc5545",
+    "ical",
     "ics",
-    "iCalendar 2.0",
-    "apple calendar format",
     "calendar events",
     "calendar alarms",
     "calendar todo",

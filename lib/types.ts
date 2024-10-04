@@ -20,7 +20,7 @@ export type Rule = {
   count: number
   interval: number
   until: string
-  wkst: Day.mo | Day.su
+  wkst: 'MO' | 'SU'
   byday: Day | Day[]
   byweekno: number
   bymonthday: number | number[]
