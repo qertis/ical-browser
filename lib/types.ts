@@ -13,8 +13,10 @@ export enum Day {
   su = 'SU',
 }
 
+export type RuleFreq = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
+
 export type Rule = {
-  freq: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
+  freq: RuleFreq
   count: number
   interval: number
   until: string
@@ -24,6 +26,8 @@ export type Rule = {
   bymonthday: number | number[]
   byyearday: number
 }
+
+export type EventStatus = 'TENTATIVE' | 'CONFIRMED' | 'CANCELLED'
 
 export interface Event {
   uid: string
@@ -38,10 +42,12 @@ export interface Event {
   organizer?: string | Address[]
   attendee?: string | Address[]
   url?: URL
-  status?: 'TENTATIVE' | 'CONFIRMED' | 'CANCELLED'
+  status?: EventStatus
   categories?: string
   rrule?: Rule
 }
+
+export type TodoStatus = 'NEEDS-ACTION' | 'COMPLETED' | 'IN-PROCESS' | 'CANCELLED'
 
 export interface Todo {
   uid: string
@@ -50,7 +56,7 @@ export interface Todo {
   summary?: string
   description?: string
   priority?: number
-  status?: 'NEEDS-ACTION' | 'COMPLETED' | 'IN-PROCESS' | 'CANCELLED'
+  status?: TodoStatus
   rrule?: Rule
 }
 

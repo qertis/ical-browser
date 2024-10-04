@@ -1,6 +1,6 @@
 {
   "name": "ical-browser",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "NodeJS and Browser iCalendar file Generator",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -51,9 +51,9 @@
   "homepage": "https://github.com/qertis/ical-browser#readme",
   "devDependencies": {
     "@types/mime-types": "^2.1.4",
-    "ical.js": "^2.0.1",
-    "tsx": "^4.16.3",
-    "typescript": "^5.5.4"
+    "ical.js": "^2.1.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
   },
   "dependencies": {
     "mime-types": "^2.1.35"
