@@ -75,6 +75,11 @@ test('icalendar', () => {
   assert.ok(ics.includes('BEGIN:VALARM'))
   assert.ok(ics.includes('END:VCALENDAR'))
 
-  const jcalData = ICAL.parse(ics)
-  assert.ok(Array.isArray(jcalData))
+  const icalData = ICAL.parse(ics)
+  assert.ok(Array.isArray(icalData))
+
+  const comp = new ICAL.Component(icalData)
+  const vevent = comp.getFirstSubcomponent('vevent')
+  const url = vevent.getFirstPropertyValue('url')
+  assert.equal(url, 'https://baskovsky.ru/#example')
 })
