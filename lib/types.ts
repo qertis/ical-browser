@@ -29,6 +29,10 @@ export type Rule = {
 
 export type EventStatus = 'TENTATIVE' | 'CONFIRMED' | 'CANCELLED'
 
+export type Klass = 'PUBLIC' | 'PRIVATE' | 'CONFIDENTIAL'
+
+export type Transp = 'TRANSPARENT' | 'OPAQUE'
+
 export interface Event {
   uid: string
   location?: string
@@ -45,6 +49,8 @@ export interface Event {
   status?: EventStatus
   categories?: string
   rrule?: Rule
+  klass?: Klass
+  transp?: Transp
 }
 
 export type TodoStatus = 'NEEDS-ACTION' | 'COMPLETED' | 'IN-PROCESS' | 'CANCELLED'

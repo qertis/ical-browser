@@ -31,10 +31,14 @@ test('icalendar', () => {
     organizer: 'Jane Doe',
     attendee: 'CN=John Smith:mailto:john.smith@example.com',
     url: new URL('https://baskovsky.ru#example'),
+    klass: 'CONFIDENTIAL',
+    transp: 'TRANSPARENT',
   })
   assert.ok(event.length > 0)
   assert.ok(event.includes('GEO:37.5739497;-85.7399606'))
   assert.ok(event.includes('.gif;'))
+  assert.ok(event.includes('CLASS:CONFIDENTIAL'))
+  assert.ok(event.includes('TRANSP:TRANSPARENT'))
 
   const todo = createTodo({
     uid,

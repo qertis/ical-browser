@@ -1,5 +1,5 @@
 import { extension } from 'mime-types'
-import { Event, Todo, Journal, Alarm, Rule } from './types'
+import { Event, Todo, Journal, Alarm, Rule, Klass, Transp } from './types'
 
 const BR = '\r\n'
 
@@ -106,6 +106,14 @@ function createUri(url: URL) {
   return 'URL;VALUE=URI:' + url.toString()
 }
 
+function createClass(klass: Klass) {
+  return 'CLASS:' + klass.toUpperCase()
+}
+
+function createTransp(transp: Transp) {
+  return 'TRANSP:' + transp.toUpperCase()
+}
+
 function createAttach(base64: string) {
   const [type, temp] = base64.split('data:')[1].split(';')
   const [encoding, data] = temp.split(',')
@@ -135,6 +143,8 @@ export function event({
   status,
   categories,
   rrule,
+  klass,
+  transp,
 }: Event) {
   let str = 'BEGIN:VEVENT' + BR
   str += `UID:${uid}` + BR
@@ -182,6 +192,12 @@ export function event({
   }
   if (url && url instanceof URL) {
     str += createUri(url) + BR
+  }
+  if (klass) {
+    str += createClass(klass) + BR
+  }
+  if (transp) {
+    str += createTransp(transp) + BR
   }
   if (rrule) {
     str += 'RRULE:' + recurrenceRule(rrule) + BR
