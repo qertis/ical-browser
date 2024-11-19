@@ -146,6 +146,7 @@ export function event({
   klass,
   transp,
   sequence,
+  priority,
 }: Event) {
   let str = 'BEGIN:VEVENT' + BR
   str += `UID:${uid}` + BR
@@ -175,6 +176,9 @@ export function event({
   }
   if (categories) {
     str += `CATEGORIES:${categories}` + BR
+  }
+  if (priority) {
+    str += `PRIORITY:${priority}` + BR
   }
   if (organizer) {
     str += createOrganizer(organizer)

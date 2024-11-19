@@ -52,6 +52,7 @@ export interface Event {
   klass?: Klass
   transp?: Transp
   sequence?: number
+  priority?: number
 }
 
 export type TodoStatus = 'NEEDS-ACTION' | 'COMPLETED' | 'IN-PROCESS' | 'CANCELLED'

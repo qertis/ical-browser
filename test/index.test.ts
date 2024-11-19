@@ -35,6 +35,7 @@ test('icalendar', () => {
     klass: 'CONFIDENTIAL',
     transp: 'TRANSPARENT',
     sequence: 1,
+    priority: 5,
   })
   assert.ok(event.length > 0)
   assert.ok(event.includes('GEO:37.5739497;-85.7399606'))
