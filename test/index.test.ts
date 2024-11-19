@@ -20,6 +20,7 @@ test('icalendar', () => {
     uid,
     location: 'Online',
     geo: [37.5739497,-85.7399606],
+    categories: ['test', 'example'],
     summary: 'Event summary',
     description: 'Event description',
     stamp: new Date(),
@@ -33,12 +34,14 @@ test('icalendar', () => {
     url: new URL('https://baskovsky.ru#example'),
     klass: 'CONFIDENTIAL',
     transp: 'TRANSPARENT',
+    sequence: 1,
   })
   assert.ok(event.length > 0)
   assert.ok(event.includes('GEO:37.5739497;-85.7399606'))
   assert.ok(event.includes('.gif;'))
   assert.ok(event.includes('CLASS:CONFIDENTIAL'))
   assert.ok(event.includes('TRANSP:TRANSPARENT'))
+  assert.ok(event.includes('SEQUENCE:1'))
 
   const todo = createTodo({
     uid,
@@ -84,6 +87,6 @@ test('icalendar', () => {
 
   const comp = new ICAL.Component(icalData)
   const vevent = comp.getFirstSubcomponent('vevent')
-  const url = vevent.getFirstPropertyValue('url')
-  assert.equal(url, 'https://baskovsky.ru/#example')
+  assert.equal(vevent.getFirstPropertyValue('url'), 'https://baskovsky.ru/#example')
+  assert.equal(vevent.getFirstPropertyValue('categories'), 'test')
 })

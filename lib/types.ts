@@ -47,10 +47,11 @@ export interface Event {
   attendee?: string | Address[]
   url?: URL
   status?: EventStatus
-  categories?: string
+  categories?: string[]
   rrule?: Rule
   klass?: Klass
   transp?: Transp
+  sequence?: number
 }
 
 export type TodoStatus = 'NEEDS-ACTION' | 'COMPLETED' | 'IN-PROCESS' | 'CANCELLED'

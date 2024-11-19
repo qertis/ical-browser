@@ -145,6 +145,7 @@ export function event({
   rrule,
   klass,
   transp,
+  sequence,
 }: Event) {
   let str = 'BEGIN:VEVENT' + BR
   str += `UID:${uid}` + BR
@@ -198,6 +199,9 @@ export function event({
   }
   if (transp) {
     str += createTransp(transp) + BR
+  }
+  if (sequence) {
+    str += `SEQUENCE:${sequence}` + BR
   }
   if (rrule) {
     str += 'RRULE:' + recurrenceRule(rrule) + BR
