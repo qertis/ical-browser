@@ -1,5 +1,5 @@
 import { extension } from 'mime-types'
-import { Event, Todo, Journal, Alarm, Rule, Klass, Transp } from './types'
+import { Address, Event, Todo, Journal, Alarm, Rule, Klass, Transp, Method, Calscale } from './types'
 
 const BR = '\r\n'
 
@@ -15,6 +15,7 @@ function dateWithUTCTime(now: Date) {
   return `${year}${month}${day}T${hours}${minutes}${seconds}Z`
 }
 
+// todo https://github.com/qertis/ical-browser/issues/1
 // Split strings that are more than 75 characters into multiple lines
 function unfolding(str: string, maxLimit = 75) {
   const length = str.length
@@ -85,7 +86,7 @@ function recurrenceRule({
   return outStr
 }
 
-function createOrganizer(organizer: string | {name: string, email: string}[]) {
+function createOrganizer(organizer: string | Address | Address[]) {
   let str = ''
   if (Array.isArray(organizer)) {
     for (const address of organizer) {
@@ -96,6 +97,13 @@ function createOrganizer(organizer: string | {name: string, email: string}[]) {
       }
       str += org + BR
     }
+  } else if (typeof organizer === 'object') {
+    let org = 'ORGANIZER;'
+    org += 'CN=' + organizer.name
+    if (organizer.email) {
+      org += `:${createEmail(organizer.email)}`
+    }
+    str += org + BR
   } else {
     str += `ORGANIZER:${organizer}` + BR
   }
@@ -302,13 +310,14 @@ export function alarm({ uid, action, description, trigger }: Alarm) {
 
 export default (
   id: string,
-  { event, todo, journal, alarm, }: { event?: string, todo?: string, journal?: string, alarm?: string }
+  { event, todo, journal, alarm, }: { event?: string, todo?: string, journal?: string, alarm?: string },
+  { method, calscale }: { method: Method, calscale: Calscale } = { method: 'PUBLISH', calscale: 'GREGORIAN' },
 ) => {
   let str = 'BEGIN:VCALENDAR' + BR
   str += 'VERSION:2.0' + BR
   str += 'PRODID:' + id + BR
-  str += 'CALSCALE:GREGORIAN' + BR
-  str += 'METHOD:PUBLISH' + BR
+  str += 'CALSCALE:' + calscale + BR
+  str += 'METHOD:' + method + BR
 
   if (event) {
     str += event + BR

@@ -83,3 +83,7 @@ export interface Alarm {
   description?: string
   trigger?: string
 }
+
+export type Method  = 'PUBLISH' | 'REQUEST' | 'REPLY' | 'CANCEL'
+
+export type Calscale = 'GREGORIAN' | 'CHINESE'
