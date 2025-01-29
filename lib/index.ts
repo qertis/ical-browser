@@ -158,14 +158,16 @@ export function event({
 }: Event) {
   let str = 'BEGIN:VEVENT' + BR
   str += `UID:${uid}` + BR
-  if (stamp instanceof Date) {
-    str += `DTSTAMP:${dateWithUTCTime(stamp)}` + BR
-  }
+  str += `DTSTAMP:${dateWithUTCTime(stamp instanceof Date ? stamp : new Date())}` + BR
   if (start instanceof Date) {
     str += `DTSTART:${dateWithUTCTime(start)}` + BR
   }
-  if (end instanceof Date) {
-    str += `DTEND:${dateWithUTCTime(end)}` + BR
+  if (start === end) {
+    str += `DURATION:${'PT1H00M'}` + BR
+  } else {
+    if (end instanceof Date) {
+      str += `DTEND:${dateWithUTCTime(end)}` + BR
+    }
   }
   if (location?.length) {
     str += `LOCATION:${location}` + BR
@@ -291,17 +293,42 @@ export function journal({
   return str
 }
 
-export function alarm({ uid, action, description, trigger }: Alarm) {
+export function alarm({ action, description, trigger, attach, attendee }: Alarm) {
   let str = 'BEGIN:VALARM' + BR
-  str += 'UID:' + uid + BR
   if (trigger) {
     str += 'TRIGGER:' + trigger + BR
   }
-  if (description?.length) {
-    str += 'DESCRIPTION:' + description + BR
-  }
-  if (action) {
-    str += 'ACTION:' + action + BR
+  str += 'ACTION:' + action.toUpperCase() + BR
+  switch (action.toUpperCase()) {
+    case 'DISPLAY': {
+      if (description?.length) {
+        str += 'DESCRIPTION:' + description + BR
+      }
+      break
+    }
+    case 'AUDIO': {
+      if (attach) {
+        str += createAttach(attach) + BR
+      }
+      break
+    }
+    case 'EMAIL': {
+      if (description?.length) {
+        str += 'DESCRIPTION:' + description + BR
+      }
+      if (attendee) {
+        str += createOrganizer(attendee) + BR
+      }
+      break
+    }
+    case 'PROCEDURE':{
+      if (attach) {
+        str += createAttach(attach) + BR
+      }
+      break
+    }
+    default:
+      break
   }
   str += 'END:VALARM'
 

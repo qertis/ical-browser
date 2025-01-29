@@ -57,6 +57,8 @@ export interface Event {
 
 export type TodoStatus = 'NEEDS-ACTION' | 'COMPLETED' | 'IN-PROCESS' | 'CANCELLED'
 
+export type Action = 'DISPLAY' | 'AUDIO' | 'EMAIL' | 'PROCEDURE'
+
 export interface Todo {
   uid: string
   stamp?: Date
@@ -78,10 +80,11 @@ export interface Journal {
 }
 
 export interface Alarm {
-  uid: string
-  action?: string
+  action: Action
   description?: string
   trigger?: string
+  attach?: string
+  attendee?: string | Address[]
 }
 
 export type Method  = 'PUBLISH' | 'REQUEST' | 'REPLY' | 'CANCEL'
