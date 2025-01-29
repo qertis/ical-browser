@@ -312,7 +312,7 @@ export class VEvent {
     if (this.#rrule) {
       str += 'RRULE:' + recurrenceRule(this.#rrule) + BR
     }
-    str += this.#alarms.map(alarm => alarm.ics) + BR
+    str += this.#alarms.map(alarm => alarm.ics + BR)
     str += 'END:VEVENT'
 
     return str
@@ -332,17 +332,17 @@ export class VTodo {
   #categories?: string[]
 
   constructor({
-                uid = globalThis.crypto.randomUUID(),
-                stamp,
-                due,
-                summary,
-                description,
-                status,
-                priority,
-                klass,
-                categories,
-                rrule,
-              }: Todo) {
+    uid = globalThis.crypto.randomUUID(),
+    stamp,
+    due,
+    summary,
+    description,
+    status,
+    priority,
+    klass,
+    categories,
+    rrule,
+  }: Todo) {
     this.#uid = uid
     this.#stamp = stamp instanceof Date ? stamp : new Date()
     if (due instanceof Date) {
@@ -359,6 +359,9 @@ export class VTodo {
     }
     if (status?.length) {
       this.#status = status
+    }
+    if (klass) {
+      this.#klass = klass
     }
     if (priority) {
       this.#priority = priority
@@ -471,6 +474,9 @@ export class VAlarm {
       throw new Error('trigger is required')
     }
     this.#trigger = trigger
+    if (!action) {
+      throw new Error('action is required')
+    }
     this.#action = action.toUpperCase()
 
     switch (this.#action) {
@@ -515,7 +521,7 @@ export class VAlarm {
       str += 'DESCRIPTION:' + this.#description + BR
     }
     if (this.#attendee) {
-      str += createOrganizer(this.#attendee) + BR
+      str += createOrganizer(this.#attendee)
     }
     if (this.#attach) {
       str += createAttach(this.#attach) + BR
@@ -564,11 +570,11 @@ export default class ICalendar {
   }
 
   addTodo(todo: VTodo) {
-    this.#todos.push(todo);
+    this.#todos.push(todo)
   }
 
   addJournal(journal: VJournal) {
-    this.#journals.push(journal);
+    this.#journals.push(journal)
   }
 
   get ics() {
@@ -577,12 +583,12 @@ export default class ICalendar {
     str += 'PRODID:' + this.#prodId + BR
     str += 'CALSCALE:' + this.#calscale + BR
     str += 'METHOD:' + this.#method + BR
-    str += this.#events.map(event => event.ics) + BR;
-    str += this.#todos.map(todo => todo.ics) + BR;
-    str += this.#journals.map(journal => journal.ics) + BR;
+    str += this.#events.map(event => event.ics + BR)
+    str += this.#todos.map(todo => todo.ics + BR)
+    str += this.#journals.map(journal => journal.ics + BR)
     str += 'END:VCALENDAR'
 
-    return str as string
+    return str
   }
 
   download(filename: string) {
