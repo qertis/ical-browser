@@ -38,6 +38,8 @@ test('icalendar', () => {
     transp: 'TRANSPARENT',
     sequence: 1,
     priority: 5,
+    'x-custom': 'custom',
+    'x-foo': 'bar',
   })
   vevent.addAlarm(valarm)
 
@@ -48,6 +50,8 @@ test('icalendar', () => {
   assert.ok(event.includes('CLASS:CONFIDENTIAL'))
   assert.ok(event.includes('TRANSP:TRANSPARENT'))
   assert.ok(event.includes('SEQUENCE:1'))
+  assert.ok(event.includes('X-CUSTOM:custom'))
+  assert.ok(event.includes('X-FOO:bar'))
 
   const vtodo = new VTodo({
     uid: '2345678901',

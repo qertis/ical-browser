@@ -166,28 +166,30 @@ export class VEvent {
   #sequence?: number
   #rrule?: Rule
   #alarms: VAlarm[]
+  #xProps?: { [xKey: string]: unknown } = {}
 
-  constructor({
-  uid = globalThis.crypto.randomUUID(),
-  location,
-  geo,
-  summary,
-  description,
-  stamp = new Date(),
-  start,
-  end,
-  attach,
-  organizer,
-  attendee,
-  url,
-  status,
-  categories,
-  rrule,
-  klass,
-  transp,
-  sequence,
-  priority,
-}: Event) {
+  constructor(data: Event) {
+    const {
+      uid = globalThis.crypto.randomUUID(),
+      location,
+      geo,
+      summary,
+      description,
+      stamp = new Date(),
+      start,
+      end,
+      attach,
+      organizer,
+      attendee,
+      url,
+      status,
+      categories,
+      rrule,
+      klass,
+      transp,
+      sequence,
+      priority,
+    } = data
     this.#uid = uid
     this.#stamp = stamp instanceof Date ? stamp : new Date()
     if (!(start instanceof Date)) {
@@ -242,6 +244,9 @@ export class VEvent {
     }
     if (rrule) {
       this.#rrule = rrule
+    }
+    for (const key of Object.keys(data).filter(key => key.toUpperCase().startsWith('X-'))) {
+      this.#xProps![key] = data[key]
     }
     this.#alarms = []
   }
@@ -311,6 +316,9 @@ export class VEvent {
     }
     if (this.#rrule) {
       str += 'RRULE:' + recurrenceRule(this.#rrule) + BR
+    }
+    for (const key in this.#xProps) {
+      str += `${key.toUpperCase()}:${this.#xProps[key]}` + BR
     }
     str += this.#alarms.map(alarm => alarm.ics + BR)
     str += 'END:VEVENT'

@@ -53,6 +53,7 @@ export interface Event {
   transp?: Transp
   sequence?: number
   priority?: number
+  [xKey: string]: unknown
 }
 
 export type TodoStatus = 'NEEDS-ACTION' | 'COMPLETED' | 'IN-PROCESS' | 'CANCELLED'
