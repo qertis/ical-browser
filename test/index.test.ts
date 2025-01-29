@@ -2,22 +2,24 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import ICAL from 'ical.js'
 import {
-  todo as createTodo,
-  event as createEvent,
-  journal as createJournal,
-  alarm as createAlarm,
-  default as icalendar,
+  VTodo,
+  VEvent,
+  VJournal,
+  VAlarm,
+  default as ICalendar,
 } from '../lib/index'
 
 test('icalendar', () => {
-  const uid = '1234567890'
-  assert.ok(createTodo)
-  assert.ok(createEvent)
-  assert.ok(createJournal)
-  assert.ok(createAlarm)
+  const valarm = new VAlarm({
+    trigger: '-PT5M',
+    description: 'Reminder',
+    action: 'DISPLAY',
+  })
+  const alarm = valarm.ics
+  assert.ok(alarm.length > 0)
 
-  const event = createEvent({
-    uid,
+  const vevent = new VEvent({
+    uid: '1234567890',
     location: 'Online',
     geo: [37.5739497,-85.7399606],
     categories: ['test', 'example'],
@@ -29,7 +31,7 @@ test('icalendar', () => {
     attach: [
       'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEAAAAACwAAAAAAQABAAACAkQBADs='
     ],
-    organizer: 'Jane Doe',
+    organizer: 'CN=Jane Doe:mailto:no-reply@example.com',
     attendee: 'CN=John Smith:mailto:john.smith@example.com',
     url: new URL('https://baskovsky.ru#example'),
     klass: 'CONFIDENTIAL',
@@ -37,6 +39,9 @@ test('icalendar', () => {
     sequence: 1,
     priority: 5,
   })
+  vevent.addAlarm(valarm)
+
+  const event = vevent.ics
   assert.ok(event.length > 0)
   assert.ok(event.includes('GEO:37.5739497;-85.7399606'))
   assert.ok(event.includes('.gif;'))
@@ -44,50 +49,46 @@ test('icalendar', () => {
   assert.ok(event.includes('TRANSP:TRANSPARENT'))
   assert.ok(event.includes('SEQUENCE:1'))
 
-  const todo = createTodo({
-    uid,
-    stamp: new Date(),
+  const vtodo = new VTodo({
+    uid: '2345678901',
     due: new Date(),
     summary: 'Task summary',
     description: 'Task description',
     priority: 1,
-    status: 'CONFIRMED',
+    status: 'COMPLETED',
   })
+  const todo = vtodo.ics
   assert.ok(todo.length > 0)
 
-  const journal = createJournal({
-    uid,
-    stamp: new Date(),
-    due: new Date(),
+  const vjournal = new VJournal({
+    uid: '3456789012',
     summary: 'Journal summary',
     description: 'Journal description',
   })
+  const journal = vjournal.ics
   assert.ok(journal.length > 0)
 
-  const alarm = createAlarm({
-    uid,
-    trigger: '-PT5M',
-    description: 'Reminder',
-    action: 'DISPLAY',
-  })
-  assert.ok(alarm.length > 0)
+  const calendar = new ICalendar()
+  calendar.addEvent(vevent)
+  calendar.addTodo(vtodo)
+  calendar.addJournal(vjournal)
 
-  const ics = icalendar('test', { event, todo, journal, alarm })
+  const ics = calendar.ics
   assert.ok(ics.includes('BEGIN:VCALENDAR'))
   assert.ok(ics.includes('BEGIN:VEVENT'))
   assert.ok(ics.includes('END:VEVENT'))
   assert.ok(ics.includes('BEGIN:VTODO'))
   assert.ok(ics.includes('END:VTODO'))
-  assert.ok(ics.includes('BEGIN:VJOURNALUID:1234567890'))
+  assert.ok(ics.includes('BEGIN:VJOURNAL'))
   assert.ok(ics.includes('END:VJOURNAL'))
   assert.ok(ics.includes('BEGIN:VALARM'))
   assert.ok(ics.includes('END:VCALENDAR'))
 
-  const icalData = ICAL.parse(ics)
+  const icalData = ICAL.parse(calendar.ics)
   assert.ok(Array.isArray(icalData))
 
   const comp = new ICAL.Component(icalData)
-  const vevent = comp.getFirstSubcomponent('vevent')
-  assert.equal(vevent.getFirstPropertyValue('url'), 'https://baskovsky.ru/#example')
-  assert.equal(vevent.getFirstPropertyValue('categories'), 'test')
+  const eventData = comp.getFirstSubcomponent('vevent')
+  assert.equal(eventData.getFirstPropertyValue('url'), 'https://baskovsky.ru/#example')
+  assert.equal(eventData.getFirstPropertyValue('categories'), 'test')
 })

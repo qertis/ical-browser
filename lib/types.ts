@@ -42,7 +42,7 @@ export interface Event {
   stamp?: Date
   start?: Date
   end?: Date
-  attach?: string[] | string
+  attach?: string | string[]
   organizer?: string | Address[]
   attendee?: string | Address[]
   url?: URL
@@ -64,9 +64,11 @@ export interface Todo {
   stamp?: Date
   due?: Date
   summary?: string
+  categories?: string[]
   description?: string
   priority?: number
   status?: TodoStatus
+  klass?: Klass
   rrule?: Rule
 }
 
