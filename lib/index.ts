@@ -1,5 +1,5 @@
 import { extension } from 'mime-types'
-import { Address, Event, Todo, Journal, Alarm, Rule, Klass, Transp, Method, Calscale } from './types'
+import { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale } from './types'
 
 const BR = '\r\n'
 
@@ -540,10 +540,64 @@ export class VAlarm {
   }
 }
 
+export class VTimezone {
+  #tzid: string // Russian Standard Time
+  #standard: Timezone | null
+  #daylight: Timezone | null
+
+  constructor({ tzid }: { tzid: string }) {
+    this.#tzid = tzid
+    this.#standard = null
+    this.#daylight = null
+  }
+
+  addStandard({ start, tzOffsetFrom, tzOffsetTo, tzname }: Timezone) {
+    this.#standard = {
+      start,
+      tzOffsetFrom,
+      tzOffsetTo,
+      tzname,
+    }
+  }
+
+  addDaylight({ start, tzOffsetFrom, tzOffsetTo, tzname }: Timezone) {
+    this.#daylight = {
+      start,
+      tzOffsetFrom,
+      tzOffsetTo,
+      tzname,
+    }
+  }
+
+  get ics() {
+    let str = 'BEGIN:VTIMEZONE' + BR
+    str += this.#tzid + BR
+
+    if (this.#standard) {
+      str += 'BEGIN:STANDARD' + BR
+      str += `DTSTART:${dateWithUTCTime(this.#standard.start)}` + BR
+      str += `TZOFFSETFROM:${this.#standard.tzOffsetFrom}` + BR
+      str += `TZOFFSETTO:${this.#standard.tzOffsetTo}` + BR
+      str += 'END:STANDARD'
+    }
+    if (this.#daylight) {
+      str += 'BEGIN:DAYLIGHT' + BR
+      str += `DTSTART:${dateWithUTCTime(this.#daylight.start)}` + BR
+      str += `TZOFFSETFROM:${this.#daylight.tzOffsetFrom}` + BR
+      str += `TZOFFSETTO:${this.#daylight.tzOffsetTo}` + BR
+      str += 'END:DAYLIGHT'
+    }
+    str += 'END:VTIMEZONE'
+
+    return str
+  }
+}
+
 export default class ICalendar {
   #events: VEvent[]
   #todos: VTodo[]
   #journals: VJournal[]
+  #timezones: VTimezone[]
 
   #prodId: string
   #calscale: string
@@ -571,6 +625,7 @@ export default class ICalendar {
     this.#events = []
     this.#todos = []
     this.#journals = []
+    this.#timezones = []
   }
 
   addEvent(event: VEvent) {
@@ -585,12 +640,17 @@ export default class ICalendar {
     this.#journals.push(journal)
   }
 
+  addTimezone(timezone: VTimezone) {
+    this.#timezones.push(timezone)
+  }
+
   get ics() {
     let str = 'BEGIN:VCALENDAR' + BR
     str += 'VERSION:2.0' + BR
     str += 'PRODID:' + this.#prodId + BR
     str += 'CALSCALE:' + this.#calscale + BR
     str += 'METHOD:' + this.#method + BR
+    str += this.#timezones.map(timezone => timezone.ics + BR)
     str += this.#events.map(event => event.ics + BR)
     str += this.#todos.map(todo => todo.ics + BR)
     str += this.#journals.map(journal => journal.ics + BR)

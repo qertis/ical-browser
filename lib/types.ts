@@ -90,6 +90,13 @@ export interface Alarm {
   attendee?: string | Address[]
 }
 
+export interface Timezone {
+  start: Date
+  tzOffsetFrom: string
+  tzOffsetTo: string
+  tzname: string
+}
+
 export type Method  = 'PUBLISH' | 'REQUEST' | 'REPLY' | 'CANCEL'
 
 export type Calscale = 'GREGORIAN' | 'CHINESE'

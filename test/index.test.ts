@@ -6,6 +6,7 @@ import {
   VEvent,
   VJournal,
   VAlarm,
+  VTimezone,
   default as ICalendar,
 } from '../lib/index'
 
@@ -17,6 +18,20 @@ test('icalendar', () => {
   })
   const alarm = valarm.ics
   assert.ok(alarm.length > 0)
+
+  const vtimezone = new VTimezone({ tzid: 'America/New_York' })
+  vtimezone.addStandard({
+    start: new Date('2023-11-05T02:00:00.611Z'),
+    tzOffsetFrom: '-0400',
+    tzOffsetTo: '-0500',
+    tzname: 'EST',
+  })
+  vtimezone.addDaylight({
+    start: new Date('2024-03-10T02:00:00.611Z'),
+    tzOffsetFrom: '-0500',
+    tzOffsetTo: '-0400',
+    tzname: 'EDT',
+  })
 
   const vevent = new VEvent({
     uid: '1234567890',
@@ -76,6 +91,7 @@ test('icalendar', () => {
   calendar.addEvent(vevent)
   calendar.addTodo(vtodo)
   calendar.addJournal(vjournal)
+  calendar.addTimezone(vtimezone)
 
   const ics = calendar.ics
   assert.ok(ics.includes('BEGIN:VCALENDAR'))
