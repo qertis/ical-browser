@@ -42,7 +42,9 @@ test('icalendar', () => {
     description: 'Event description',
     stamp: new Date(),
     start: new Date('2024-01-01T10:10:00.611Z'),
+    startTz: 'America/New_York',
     end: new Date('2024-01-02T10:12:00.611Z'),
+    endTz: 'America/New_York',
     attach: [
       'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEAAAAACwAAAAAAQABAAACAkQBADs='
     ],
@@ -67,6 +69,7 @@ test('icalendar', () => {
   assert.ok(event.includes('SEQUENCE:1'))
   assert.ok(event.includes('X-CUSTOM:custom'))
   assert.ok(event.includes('X-FOO:bar'))
+  assert.ok(event.includes('DTSTART;TZID=America/New_York:20240101T101000'))
 
   const vtodo = new VTodo({
     uid: '2345678901',

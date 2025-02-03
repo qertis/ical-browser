@@ -4,7 +4,7 @@ import { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Me
 const BR = '\r\n'
 
 // Date conversion to Date UTC Time standard
-function dateWithUTCTime(now: Date) {
+function dateWithUTCTime(now: Date, timezone?: string) {
   const year = now.getUTCFullYear()
   const month = (now.getUTCMonth() + 1).toString().padStart(2, '0')
   const day = now.getUTCDate().toString().padStart(2, '0')
@@ -12,7 +12,10 @@ function dateWithUTCTime(now: Date) {
   const minutes = now.getUTCMinutes().toString().padStart(2, '0')
   const seconds = now.getUTCSeconds().toString().padStart(2, '0')
 
-  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`
+  if (timezone) {
+    return `;TZID=${timezone}:${year}${month}${day}T${hours}${minutes}${seconds}`
+  }
+  return `:${year}${month}${day}T${hours}${minutes}${seconds}Z`
 }
 
 // todo https://github.com/qertis/ical-browser/issues/1
@@ -145,11 +148,25 @@ function createAttach(base64: string) {
   return str
 }
 
-export class VEvent {
-  #uid: string
-  #stamp: Date
+interface IBase {
+  readonly ics: string
+}
+
+class VBase {
+  protected uid: string
+  protected stamp: Date
+
+  constructor({ uid, stamp }: { uid?: string, stamp?: Date }) {
+    this.uid = uid ?? globalThis.crypto.randomUUID()
+    this.stamp = stamp ?? new Date()
+  }
+}
+
+export class VEvent extends VBase implements IBase {
   #start: Date
+  #startTz?: string
   #end: Date
+  #endTz?: string
   #location?: string
   #geo?: number[]
   #summary?: string
@@ -169,15 +186,16 @@ export class VEvent {
   #xProps?: { [xKey: string]: unknown } = {}
 
   constructor(data: Event) {
+    super(data)
     const {
-      uid = globalThis.crypto.randomUUID(),
       location,
       geo,
       summary,
       description,
-      stamp = new Date(),
       start,
+      startTz,
       end,
+      endTz,
       attach,
       organizer,
       attendee,
@@ -190,8 +208,6 @@ export class VEvent {
       sequence,
       priority,
     } = data
-    this.#uid = uid
-    this.#stamp = stamp instanceof Date ? stamp : new Date()
     if (!(start instanceof Date)) {
       throw new Error('start must be a Date object')
     }
@@ -199,7 +215,13 @@ export class VEvent {
     if (!(end instanceof Date)) {
       throw new Error('end must be a Date object')
     }
+    if (startTz) {
+      this.#startTz = startTz
+    }
     this.#end = end
+    if (endTz) {
+      this.#endTz = endTz
+    }
     if (location?.length) {
       this.#location = location
     }
@@ -256,80 +278,82 @@ export class VEvent {
   }
 
   get ics() {
-    let str = 'BEGIN:VEVENT' + BR
-    str += `UID:${this.#uid}` + BR
-    str += `DTSTAMP:${dateWithUTCTime(this.#stamp)}` + BR
-    str += `DTSTART:${dateWithUTCTime(this.#start)}` + BR
+    const temp: string[] = []
+    temp.push('BEGIN:VEVENT')
+    temp.push(`UID:${this.uid}`)
+    temp.push(`DTSTAMP${dateWithUTCTime(this.stamp)}`)
+    temp.push(`DTSTART${dateWithUTCTime(this.#start, this.#startTz)}`)
 
     if (this.#start === this.#end) {
-      str += `DURATION:${'PT1H00M'}` + BR
+      // todo хардкод: по-умолчанию длительность 1 час
+      temp.push(`DURATION:${'PT1H00M'}`)
     } else {
-      str += `DTEND:${dateWithUTCTime(this.#end)}` + BR
+      temp.push(`DTEND${dateWithUTCTime(this.#end, this.#endTz)}`)
     }
     if (this.#location) {
-      str += `LOCATION:${this.#location}` + BR
+      temp.push(`LOCATION:${this.#location}`)
     }
     if (this.#geo) {
-      str += `GEO:${this.#geo[0]};${this.#geo[1]}` + BR
+      temp.push(`GEO:${this.#geo[0]};${this.#geo[1]}`)
     }
     if (this.#summary) {
-      str += `SUMMARY:${unfolding(this.#summary)}` + BR
+      temp.push(`SUMMARY:${unfolding(this.#summary)}`)
     }
     if (this.#description) {
-      str += `DESCRIPTION:${(this.#description)}` + BR
+      temp.push(`DESCRIPTION:${(this.#description)}`)
     }
     if (this.#status) {
-      str += `STATUS:${this.#status}` + BR
+      temp.push(`STATUS:${this.#status}`)
     }
     if (this.#categories) {
-      str += `CATEGORIES:${this.#categories}` + BR
+      temp.push(`CATEGORIES:${this.#categories}`)
     }
     if (this.#priority) {
-      str += `PRIORITY:${this.#priority}` + BR
+      temp.push(`PRIORITY:${this.#priority}`)
     }
     if (this.#organizer) {
-      str += createOrganizer(this.#organizer)
+      temp.push(createOrganizer(this.#organizer))
     }
     if (this.#attendee) {
-      str += createOrganizer(this.#attendee)
+      temp.push(createOrganizer(this.#attendee))
     }
     if (this.#attach) {
       if (Array.isArray(this.#attach)) {
         for (const base64 of this.#attach) {
-          str += createAttach(base64) + BR
+          temp.push(createAttach(base64))
         }
       } else {
-        str += createAttach(this.#attach) + BR
+        temp.push(createAttach(this.#attach))
       }
     }
     if (this.#url) {
-      str += createUri(this.#url) + BR
+      temp.push(createUri(this.#url))
     }
     if (this.#klass) {
-      str += createClass(this.#klass) + BR
+      temp.push(createClass(this.#klass))
     }
     if (this.#transp) {
-      str += createTransp(this.#transp) + BR
+      temp.push(createTransp(this.#transp))
     }
     if (this.#sequence) {
-      str += `SEQUENCE:${this.#sequence}` + BR
+      temp.push(`SEQUENCE:${this.#sequence}`)
     }
     if (this.#rrule) {
-      str += 'RRULE:' + recurrenceRule(this.#rrule) + BR
+      temp.push('RRULE:' + recurrenceRule(this.#rrule))
     }
     for (const key in this.#xProps) {
-      str += `${key.toUpperCase()}:${this.#xProps[key]}` + BR
+      temp.push(`${key.toUpperCase()}:${this.#xProps[key]}`)
     }
-    str += this.#alarms.map(alarm => alarm.ics + BR)
-    str += 'END:VEVENT'
+    for (const {ics} of this.#alarms) {
+      temp.push(ics)
+    }
+    temp.push('END:VEVENT')
 
-    return str
+    return temp.join(BR)
   }
 }
 
-export class VTodo {
-  #uid: string
-  #stamp: Date
+export class VTodo extends VBase implements IBase {
   #due?: Date
   #summary?: string
   #description?: string
@@ -339,20 +363,18 @@ export class VTodo {
   #klass?: Klass
   #categories?: string[]
 
-  constructor({
-    uid = globalThis.crypto.randomUUID(),
-    stamp,
-    due,
-    summary,
-    description,
-    status,
-    priority,
-    klass,
-    categories,
-    rrule,
-  }: Todo) {
-    this.#uid = uid
-    this.#stamp = stamp instanceof Date ? stamp : new Date()
+  constructor(data: Todo) {
+    super(data)
+    const {
+      due,
+      summary,
+      description,
+      status,
+      priority,
+      klass,
+      categories,
+      rrule,
+    } = data
     if (due instanceof Date) {
       this.#due = due
     }
@@ -380,58 +402,55 @@ export class VTodo {
   }
 
   get ics() {
-    let str = 'BEGIN:VTODO' + BR
-    str += 'UID:' + this.#uid + BR
-    str += `DTSTAMP:${dateWithUTCTime(this.#stamp)}` + BR
+    const temp: string[] = []
+    temp.push('BEGIN:VTODO')
+    temp.push('UID:' + this.uid)
+    temp.push(`DTSTAMP${dateWithUTCTime(this.stamp)}`)
     if (this.#due) {
       // todo поддержать VALUE=DATE если не указано время, а указана только дата
-      str += `DUE;VALUE=DATE-TIME:${dateWithUTCTime(this.#due)}` + BR
+      temp.push(`DUE;VALUE=DATE-TIME${dateWithUTCTime(this.#due)}`)
     }
     if (this.#summary) {
-      str += 'SUMMARY:' + unfolding(this.#summary) + BR
+      temp.push('SUMMARY:' + unfolding(this.#summary))
     }
     if (this.#klass) {
-      str += createClass(this.#klass) + BR
+      temp.push(createClass(this.#klass))
     }
     if (this.#categories) {
-      str += `CATEGORIES:${this.#categories}` + BR
+      temp.push(`CATEGORIES:${this.#categories}`)
     }
     if (this.#description) {
-      str += 'DESCRIPTION:' + (this.#description) + BR
+      temp.push('DESCRIPTION:' + (this.#description))
     }
     if (this.#priority) {
-      str += 'PRIORITY:' + String(this.#priority) + BR
+      temp.push('PRIORITY:' + String(this.#priority))
     }
     if (this.#status) {
-      str += 'STATUS:' + this.#status + BR
+      temp.push('STATUS:' + this.#status)
     }
     if (this.#rrule) {
-      str += 'RRULE:' + recurrenceRule(this.#rrule) + BR
+      temp.push('RRULE:' + recurrenceRule(this.#rrule))
     }
-    str += 'END:VTODO'
+    temp.push('END:VTODO')
 
-    return str
+    return temp.join(BR)
   }
 }
 
-export class VJournal {
-  #uid: string
-  #stamp: Date
+export class VJournal extends VBase implements IBase {
   #start?: Date
   #summary?: string
   #description?: string
   #rrule?: Rule
 
-  constructor({
-    uid = globalThis.crypto.randomUUID(),
-    stamp,
-    start,
-    summary,
-    description,
-    rrule,
-  }: Journal) {
-    this.#uid = uid
-    this.#stamp = stamp instanceof Date ? stamp : new Date()
+  constructor(data: Journal) {
+    super(data)
+    const {
+      start,
+      summary,
+      description,
+      rrule,
+    } = data
     if (start instanceof Date) {
       this.#start = start
     }
@@ -447,37 +466,39 @@ export class VJournal {
   }
 
   get ics() {
-    let str = 'BEGIN:VJOURNAL' + BR
-    str += `UID:${this.#uid}` + BR
-    if (this.#stamp) {
-      str += `DTSTAMP:${dateWithUTCTime(this.#stamp)}` + BR
+    const temp: string[] = []
+    temp.push('BEGIN:VJOURNAL')
+    temp.push(`UID:${this.uid}`)
+    if (this.stamp) {
+      temp.push(`DTSTAMP${dateWithUTCTime(this.stamp)}`)
     }
     if (this.#start) {
-      str += `DTSTART:${dateWithUTCTime(this.#start)}` + BR
+      temp.push(`DTSTART${dateWithUTCTime(this.#start)}`)
     }
     if (this.#summary) {
-      str += `SUMMARY:${unfolding(this.#summary)}` + BR
+      temp.push(`SUMMARY:${unfolding(this.#summary)}`)
     }
     if (this.#description) {
-      str += `DESCRIPTION:${(this.#description)}` + BR
+      temp.push(`DESCRIPTION:${(this.#description)}`)
     }
     if (this.#rrule) {
-      str += 'RRULE:' + recurrenceRule(this.#rrule) + BR
+      temp.push('RRULE:' + recurrenceRule(this.#rrule))
     }
-    str += 'END:VJOURNAL'
+    temp.push('END:VJOURNAL')
 
-    return str
+    return temp.join(BR)
   }
 }
 
-export class VAlarm {
+export class VAlarm implements IBase {
   #action: string
   #trigger: string
   #description?: string
   #attach?: string
   #attendee?: string | Address[]
 
-  constructor({ action, description, trigger, attach, attendee}: Alarm) {
+  constructor(data: Alarm) {
+    const { action, description, trigger, attach, attendee} = data
     if (!trigger) {
       throw new Error('trigger is required')
     }
@@ -521,26 +542,27 @@ export class VAlarm {
   }
 
   get ics() {
-    let str = 'BEGIN:VALARM' + BR
-    str += 'TRIGGER:' + this.#trigger + BR
-    str += 'ACTION:' + this.#action + BR
+    const temp: string[] = []
+    temp.push('BEGIN:VALARM')
+    temp.push('TRIGGER:' + this.#trigger)
+    temp.push('ACTION:' + this.#action)
 
     if (this.#description) {
-      str += 'DESCRIPTION:' + this.#description + BR
+      temp.push('DESCRIPTION:' + this.#description)
     }
     if (this.#attendee) {
-      str += createOrganizer(this.#attendee)
+      temp.push(createOrganizer(this.#attendee))
     }
     if (this.#attach) {
-      str += createAttach(this.#attach) + BR
+      temp.push(createAttach(this.#attach))
     }
-    str += 'END:VALARM'
+    temp.push('END:VALARM')
 
-    return str
+    return temp.join(BR)
   }
 }
 
-export class VTimezone {
+export class VTimezone implements IBase {
   #tzid: string // Russian Standard Time
   #standard: Timezone | null
   #daylight: Timezone | null
@@ -570,26 +592,27 @@ export class VTimezone {
   }
 
   get ics() {
-    let str = 'BEGIN:VTIMEZONE' + BR
-    str += this.#tzid + BR
+    const temp: string[] = []
+    temp.push('BEGIN:VTIMEZONE')
+    temp.push('TZID:' + this.#tzid)
 
     if (this.#standard) {
-      str += 'BEGIN:STANDARD' + BR
-      str += `DTSTART:${dateWithUTCTime(this.#standard.start)}` + BR
-      str += `TZOFFSETFROM:${this.#standard.tzOffsetFrom}` + BR
-      str += `TZOFFSETTO:${this.#standard.tzOffsetTo}` + BR
-      str += 'END:STANDARD'
+      temp.push('BEGIN:STANDARD')
+      temp.push(`DTSTART${dateWithUTCTime(this.#standard.start)}`)
+      temp.push(`TZOFFSETFROM:${this.#standard.tzOffsetFrom}`)
+      temp.push(`TZOFFSETTO:${this.#standard.tzOffsetTo}`)
+      temp.push('END:STANDARD')
     }
     if (this.#daylight) {
-      str += 'BEGIN:DAYLIGHT' + BR
-      str += `DTSTART:${dateWithUTCTime(this.#daylight.start)}` + BR
-      str += `TZOFFSETFROM:${this.#daylight.tzOffsetFrom}` + BR
-      str += `TZOFFSETTO:${this.#daylight.tzOffsetTo}` + BR
-      str += 'END:DAYLIGHT'
+      temp.push('BEGIN:DAYLIGHT')
+      temp.push(`DTSTART${dateWithUTCTime(this.#daylight.start)}`)
+      temp.push(`TZOFFSETFROM:${this.#daylight.tzOffsetFrom}`)
+      temp.push(`TZOFFSETTO:${this.#daylight.tzOffsetTo}`)
+      temp.push('END:DAYLIGHT')
     }
-    str += 'END:VTIMEZONE'
+    temp.push('END:VTIMEZONE')
 
-    return str
+    return temp.join(BR)
   }
 }
 
@@ -645,18 +668,27 @@ export default class ICalendar {
   }
 
   get ics() {
-    let str = 'BEGIN:VCALENDAR' + BR
-    str += 'VERSION:2.0' + BR
-    str += 'PRODID:' + this.#prodId + BR
-    str += 'CALSCALE:' + this.#calscale + BR
-    str += 'METHOD:' + this.#method + BR
-    str += this.#timezones.map(timezone => timezone.ics + BR)
-    str += this.#events.map(event => event.ics + BR)
-    str += this.#todos.map(todo => todo.ics + BR)
-    str += this.#journals.map(journal => journal.ics + BR)
-    str += 'END:VCALENDAR'
+    const temp: string[] = []
+    temp.push('BEGIN:VCALENDAR')
+    temp.push('VERSION:2.0')
+    temp.push('PRODID:' + this.#prodId)
+    temp.push('CALSCALE:' + this.#calscale)
+    temp.push('METHOD:' + this.#method)
+    for (const {ics} of this.#timezones) {
+      temp.push(ics)
+    }
+    for (const {ics} of this.#events) {
+      temp.push(ics)
+    }
+    for (const {ics} of this.#todos) {
+      temp.push(ics)
+    }
+    for (const {ics} of this.#journals) {
+      temp.push(ics)
+    }
+    temp.push('END:VCALENDAR')
 
-    return str
+    return temp.join(BR)
   }
 
   download(filename: string) {

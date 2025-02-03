@@ -41,6 +41,8 @@ export interface Event {
   description?: string
   stamp?: Date
   start?: Date
+  startTz?: string
+  endTz?: string
   end?: Date
   attach?: string | string[]
   organizer?: string | Address[]
