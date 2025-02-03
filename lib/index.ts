@@ -544,7 +544,11 @@ export class VAlarm implements IBase {
   get ics() {
     const temp: string[] = []
     temp.push('BEGIN:VALARM')
-    temp.push('TRIGGER:' + this.#trigger)
+    if (this.#trigger.includes(':')) {
+      temp.push('TRIGGER;' + this.#trigger)
+    } else {
+      temp.push('TRIGGER:' + this.#trigger)
+    }
     temp.push('ACTION:' + this.#action)
 
     if (this.#description) {
