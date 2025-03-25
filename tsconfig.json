@@ -2,11 +2,6 @@
   "compilerOptions": {
     "declaration": true,
     "skipLibCheck": true,
-    "isolatedModules": true,
-    "esModuleInterop": true,
-    "outDir": "./dist",
-    "removeComments": true,
-    "strict": true,
     "target": "esnext"
   },
   "exclude": [

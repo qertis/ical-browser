@@ -1,5 +1,5 @@
 import { extension } from 'mime-types'
-import { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale } from './types'
+import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale } from './types'
 
 const BR = '\r\n'
 
