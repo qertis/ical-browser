@@ -55,6 +55,17 @@ test('icalendar', () => {
     transp: 'TRANSPARENT',
     sequence: 1,
     priority: 5,
+    rrule: {
+      freq: 'WEEKLY',
+      count: 10,
+      interval: 2,
+      until: new Date('2024-12-31T23:59:59.611Z'),
+      wkst: 'MO',
+      byday: ['MO', 'WE', 'FR'],
+      bymonthday: [5, 15, 25],
+      byweekno: [10, 20],
+      byyearday: [100, 200],
+    },
     'x-custom': 'custom',
     'x-foo': 'bar',
   })
@@ -70,6 +81,7 @@ test('icalendar', () => {
   assert.ok(event.includes('X-CUSTOM:custom'))
   assert.ok(event.includes('X-FOO:bar'))
   assert.ok(event.includes('DTSTART;TZID=America/New_York:20240101T101000'))
+  assert.ok(event.includes('RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=10;UNTIL=20241231T235959Z;MO;BYDAY=MO,WE,FR;BYWEEKNO10,20;BYMONTHDAY=5,15,25;BYYEARDAY100,200;'))
 
   const vtodo = new VTodo({
     uid: '2345678901',

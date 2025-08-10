@@ -4,6 +4,7 @@ import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Trans
 const BR = '\r\n'
 
 // Date conversion to Date UTC Time standard
+// todo возвращать без символов ; и :
 function dateWithUTCTime(now: Date, timezone?: string) {
   const year = now.getUTCFullYear()
   const month = (now.getUTCMonth() + 1).toString().padStart(2, '0')
@@ -61,7 +62,7 @@ function recurrenceRule({
     outStr += 'COUNT=' + count + ';'
   }
   if (until) {
-    outStr += 'UNTIL=' + until + ';'
+    outStr += 'UNTIL=' + dateWithUTCTime(until).replace(';', '').replace(':', '') + ';'
   }
   outStr += wkst + ';'
   if (byday) {

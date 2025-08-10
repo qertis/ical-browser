@@ -19,7 +19,7 @@ export type Rule = {
   freq: RuleFreq
   count: number
   interval: number
-  until: string
+  until: Date
   wkst: 'MO' | 'SU'
   byday: Day | Day[]
   byweekno: number
