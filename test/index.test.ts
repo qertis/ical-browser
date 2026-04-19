@@ -73,6 +73,7 @@ test('icalendar', () => {
 
   const event = vevent.ics
   assert.ok(event.length > 0)
+  assert.ok(!event.includes('\n\n'))
   assert.ok(event.includes('GEO:37.5739497;-85.7399606'))
   assert.ok(event.includes('.gif;'))
   assert.ok(event.includes('CLASS:CONFIDENTIAL'))

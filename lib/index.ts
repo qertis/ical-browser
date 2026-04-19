@@ -1,5 +1,6 @@
 import { extension } from 'mime-types'
 import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale } from './types'
+import { IBase } from './interfaces'
 
 const BR = '\r\n'
 
@@ -96,13 +97,12 @@ function recurrenceRule({
 function createOrganizer(organizer: string | Address | Address[]) {
   let str = ''
   if (Array.isArray(organizer)) {
+    // todo - поддержать множество организаторов
     for (const address of organizer) {
       let org = 'ORGANIZER;'
       org += 'CN=' + address.name
       if (address.email) {
         org += `:${createEmail(address.email)}`
-      } else {
-        // todo если не указан email, то добавлять фиктивный email
       }
       str += org + BR
     }
@@ -111,12 +111,10 @@ function createOrganizer(organizer: string | Address | Address[]) {
     org += 'CN=' + organizer.name
     if (organizer.email) {
       org += `:${createEmail(organizer.email)}`
-    } else {
-      // todo если не указан email, то добавлять фиктивный email
     }
-    str += org + BR
+    str += org
   } else {
-    str += `ORGANIZER:${organizer}` + BR
+    str += `ORGANIZER:${organizer}`
   }
 
   return str
@@ -147,10 +145,6 @@ function createAttach(base64: string) {
   str += ':' + data
 
   return str
-}
-
-interface IBase {
-  readonly ics: string
 }
 
 class VBase {
