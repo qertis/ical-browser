@@ -55,6 +55,7 @@ export interface Event {
   transp?: Transp
   sequence?: number
   priority?: number
+  lastModified?: Date
   [xKey: string]: unknown
 }
 

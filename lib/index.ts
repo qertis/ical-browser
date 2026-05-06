@@ -196,6 +196,7 @@ export class VEvent extends VBase implements IBase {
   #transp?: Transp
   #sequence?: number
   #rrule?: Rule
+  #lastModified?: Date
   #alarms: VAlarm[]
   #xProps?: { [xKey: string]: unknown } = {}
 
@@ -221,6 +222,7 @@ export class VEvent extends VBase implements IBase {
       transp,
       sequence,
       priority,
+      lastModified,
     } = data
     if (!(start instanceof Date)) {
       throw new Error('start must be a Date object')
@@ -281,6 +283,9 @@ export class VEvent extends VBase implements IBase {
     if (rrule) {
       this.#rrule = rrule
     }
+    if (lastModified instanceof Date) {
+      this.#lastModified = lastModified
+    }
     for (const key of Object.keys(data).filter(key => key.toUpperCase().startsWith('X-'))) {
       this.#xProps![key] = data[key]
     }
@@ -296,6 +301,9 @@ export class VEvent extends VBase implements IBase {
     temp.push('BEGIN:VEVENT')
     temp.push(`UID:${this.uid}`)
     temp.push(`DTSTAMP${dateWithUTCTime(this.stamp)}`)
+    if (this.#lastModified) {
+      temp.push(`LAST-MODIFIED${dateWithUTCTime(this.#lastModified)}`)
+    }
     temp.push(`DTSTART${dateWithUTCTime(this.#start, this.#startTz)}`)
 
     if (this.#start === this.#end) {

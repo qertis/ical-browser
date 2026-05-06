@@ -45,6 +45,7 @@ test('icalendar', () => {
     startTz: 'America/New_York',
     end: new Date('2024-01-02T10:12:00.611Z'),
     endTz: 'America/New_York',
+    lastModified: new Date('2024-07-30T07:26:28Z'),
     attach: [
       'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEAAAAACwAAAAAAQABAAACAkQBADs='
     ],
@@ -82,6 +83,7 @@ test('icalendar', () => {
   assert.ok(event.includes('X-CUSTOM:custom'))
   assert.ok(event.includes('X-FOO:bar'))
   assert.ok(event.includes('DTSTART;TZID=America/New_York:20240101T101000'))
+  assert.ok(event.includes('LAST-MODIFIED:20240730T072628Z'))
   assert.ok(event.includes('RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=10;UNTIL=20241231T235959Z;MO;BYDAY=MO,WE,FR;BYWEEKNO10,20;BYMONTHDAY=5,15,25;BYYEARDAY100,200;'))
 
   const vtodo = new VTodo({
