@@ -128,3 +128,87 @@ test('icalendar', () => {
   assert.equal(eventData.getFirstPropertyValue('url'), 'https://baskovsky.ru/#example')
   assert.equal(eventData.getFirstPropertyValue('categories'), 'test')
 })
+
+test('RFC 5545: 75 octets', () => {
+  const encoder = new TextEncoder()
+
+  function physicalLines(ics: string): string[] {
+    return ics.split('\r\n')
+  }
+
+  function assertMaxLineLength(ics: string, label: string) {
+    for (const line of physicalLines(ics)) {
+      const byteLen = encoder.encode(line).length
+      assert.ok(byteLen <= 75, `${label}: line exceeds 75 bytes (${byteLen}): ${JSON.stringify(line.slice(0, 60))}`)
+    }
+  }
+
+  function assertFoldedLinesHaveLeadingSpace(ics: string, label: string) {
+    const lines = physicalLines(ics)
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i]
+      if (line.startsWith(' ')) {
+        assert.ok(!line.startsWith('  ') || line.trimStart().length === 0,
+          `${label}: continuation line must start with exactly one space: ${JSON.stringify(line.slice(0, 40))}`)
+      }
+    }
+  }
+
+  const asciiSummary = 'A'.repeat(80)
+  const eventAscii = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    summary: asciiSummary,
+  })
+  assertMaxLineLength(eventAscii.ics, 'ASCII summary')
+
+  const cyrillicSummary = 'Событие'.repeat(10)
+  const eventCyrillic = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    summary: cyrillicSummary,
+  })
+  assertMaxLineLength(eventCyrillic.ics, 'Cyrillic summary')
+  assertFoldedLinesHaveLeadingSpace(eventCyrillic.ics, 'Cyrillic summary')
+
+  const longDescription = 'Дорогие коллеги!\\nМы рады сообщить о запуске новой инициативы – Random, ' +
+    'которая состоится 10 ноября.\\nЭто отличный способ познакомиться и пообщаться с коллегами.'
+  const eventWithDesc = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    summary: 'Test',
+    description: longDescription,
+  })
+  assertMaxLineLength(eventWithDesc.ics, 'VEvent Cyrillic description')
+
+  const cal = new ICalendar({ id: '-//test//EN' })
+  cal.addEvent(eventWithDesc)
+  const parsedData = ICAL.parse(cal.ics)
+  assert.ok(Array.isArray(parsedData), 'ical.js parse result must be an array')
+  const parsedComp = new ICAL.Component(parsedData)
+  const parsedEvent = parsedComp.getFirstSubcomponent('vevent')
+  assert.ok(parsedEvent.getFirstPropertyValue('description').includes('коллеги'), 'description value must be preserved after fold/unfold')
+
+  const todoWithLongSummary = new VTodo({
+    summary: 'Задача: '.repeat(10) + 'завершить',
+    description: 'Подробное описание задачи: '.repeat(5),
+  })
+  assertMaxLineLength(todoWithLongSummary.ics, 'VTodo Cyrillic summary+description')
+
+  const journalWithLongSummary = new VJournal({
+    summary: 'Запись журнала о важном событии которое произошло сегодня утром после долгого ожидания',
+    description: 'Подробности: сегодня состоялось очень важное событие\\, которое изменит наш рабочий процесс навсегда.',
+  })
+  assertMaxLineLength(journalWithLongSummary.ics, 'VJournal Cyrillic summary+description')
+
+  const shortEvent = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    summary: 'Short',
+    description: 'Brief',
+  })
+  const shortLines = physicalLines(shortEvent.ics)
+  const summaryLine = shortLines.find(l => l.startsWith('SUMMARY:'))
+  assert.ok(summaryLine, 'SUMMARY line must exist')
+  assert.equal(summaryLine, 'SUMMARY:Short', 'Short summary must not be folded')
+})

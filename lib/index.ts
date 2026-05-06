@@ -20,19 +20,38 @@ function dateWithUTCTime(now: Date, timezone?: string) {
   return `:${year}${month}${day}T${hours}${minutes}${seconds}Z`
 }
 
-// todo https://github.com/qertis/ical-browser/issues/1
-// Split strings that are more than 75 characters into multiple lines
-function unfolding(str: string, maxLimit = 75) {
-  const length = str.length
-  let outStr = ''
-  if (length < maxLimit) {
-    return str
-  }
-  for (let i = 0, j = 2; i < length; i += maxLimit % length, j += 1) {
-    outStr += str.slice(i, i + maxLimit) + '\n' + ' '.repeat(j)
+// RFC 5545: lines MUST NOT be longer than 75 octets (bytes), excluding the line break.
+function folding(line: string, maxLimit = 75): string {
+  const encoder = new TextEncoder()
+  if (encoder.encode(line).length <= maxLimit) {
+    return line
   }
 
-  return outStr
+  const continuationPrefix = ' '
+  const continuationLimit = maxLimit - continuationPrefix.length
+
+  let result = ''
+  let byteCount = 0
+  let currentLimit = maxLimit
+
+  for (let i = 0; i < line.length; ) {
+    const cp = line.codePointAt(i)!
+    const charWidth = cp > 0xFFFF ? 2 : 1
+    const charStr = line.slice(i, i + charWidth)
+    const charBytes = encoder.encode(charStr).length
+
+    if (byteCount > 0 && byteCount + charBytes > currentLimit) {
+      result += BR + continuationPrefix
+      byteCount = continuationPrefix.length
+      currentLimit = continuationLimit
+    }
+
+    result += charStr
+    byteCount += charBytes
+    i += charWidth
+  }
+
+  return result
 }
 
 function createEmail(str: string) {
@@ -286,16 +305,16 @@ export class VEvent extends VBase implements IBase {
       temp.push(`DTEND${dateWithUTCTime(this.#end, this.#endTz)}`)
     }
     if (this.#location) {
-      temp.push(`LOCATION:${this.#location}`)
+      temp.push(folding(`LOCATION:${this.#location}`))
     }
     if (this.#geo) {
       temp.push(`GEO:${this.#geo[0]};${this.#geo[1]}`)
     }
     if (this.#summary) {
-      temp.push(`SUMMARY:${unfolding(this.#summary)}`)
+      temp.push(folding(`SUMMARY:${this.#summary}`))
     }
     if (this.#description) {
-      temp.push(`DESCRIPTION:${(this.#description)}`)
+      temp.push(folding(`DESCRIPTION:${this.#description}`))
     }
     if (this.#status) {
       temp.push(`STATUS:${this.#status}`)
@@ -406,7 +425,7 @@ export class VTodo extends VBase implements IBase {
       temp.push(`DUE;VALUE=DATE-TIME${dateWithUTCTime(this.#due)}`)
     }
     if (this.#summary) {
-      temp.push('SUMMARY:' + unfolding(this.#summary))
+      temp.push(folding('SUMMARY:' + this.#summary))
     }
     if (this.#klass) {
       temp.push(createClass(this.#klass))
@@ -415,7 +434,7 @@ export class VTodo extends VBase implements IBase {
       temp.push(`CATEGORIES:${this.#categories}`)
     }
     if (this.#description) {
-      temp.push('DESCRIPTION:' + (this.#description))
+      temp.push(folding('DESCRIPTION:' + this.#description))
     }
     if (this.#priority) {
       temp.push('PRIORITY:' + String(this.#priority))
@@ -471,10 +490,10 @@ export class VJournal extends VBase implements IBase {
       temp.push(`DTSTART${dateWithUTCTime(this.#start)}`)
     }
     if (this.#summary) {
-      temp.push(`SUMMARY:${unfolding(this.#summary)}`)
+      temp.push(folding(`SUMMARY:${this.#summary}`))
     }
     if (this.#description) {
-      temp.push(`DESCRIPTION:${(this.#description)}`)
+      temp.push(folding(`DESCRIPTION:${this.#description}`))
     }
     if (this.#rrule) {
       temp.push('RRULE:' + recurrenceRule(this.#rrule))
