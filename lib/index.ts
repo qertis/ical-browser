@@ -5,7 +5,6 @@ import { IBase } from './interfaces'
 const BR = '\r\n'
 
 // Date conversion to Date UTC Time standard
-// todo возвращать без символов ; и :
 function dateWithUTCTime(now: Date, timezone?: string) {
   const year = now.getUTCFullYear()
   const month = (now.getUTCMonth() + 1).toString().padStart(2, '0')
@@ -14,14 +13,18 @@ function dateWithUTCTime(now: Date, timezone?: string) {
   const minutes = now.getUTCMinutes().toString().padStart(2, '0')
   const seconds = now.getUTCSeconds().toString().padStart(2, '0')
 
-  if (timezone) {
-    return `;TZID=${timezone}:${year}${month}${day}T${hours}${minutes}${seconds}`
-  }
-  return `:${year}${month}${day}T${hours}${minutes}${seconds}Z`
+  return `${year}${month}${day}T${hours}${minutes}${seconds}${timezone ? '' : 'Z'}`
+}
+
+function dateTimeProperty(now: Date, timezone?: string) {
+  const value = dateWithUTCTime(now, timezone)
+
+  return timezone ? `;TZID=${timezone}:${value}` : `:${value}`
 }
 
 // RFC 5545: lines MUST NOT be longer than 75 octets (bytes), excluding the line break.
 function folding(line: string, maxLimit = 75): string {
+  line = line.replace(/\r\n|\r|\n/g, '\\n')
   const encoder = new TextEncoder()
   if (encoder.encode(line).length <= maxLimit) {
     return line
@@ -82,7 +85,7 @@ function recurrenceRule({
     outStr += 'COUNT=' + count + ';'
   }
   if (until) {
-    outStr += 'UNTIL=' + dateWithUTCTime(until).replace(';', '').replace(':', '') + ';'
+    outStr += 'UNTIL=' + dateWithUTCTime(until) + ';'
   }
   outStr += wkst + ';'
   if (byday) {
@@ -300,17 +303,17 @@ export class VEvent extends VBase implements IBase {
     const temp: string[] = []
     temp.push('BEGIN:VEVENT')
     temp.push(`UID:${this.uid}`)
-    temp.push(`DTSTAMP${dateWithUTCTime(this.stamp)}`)
+    temp.push(`DTSTAMP${dateTimeProperty(this.stamp)}`)
     if (this.#lastModified) {
-      temp.push(`LAST-MODIFIED${dateWithUTCTime(this.#lastModified)}`)
+      temp.push(`LAST-MODIFIED${dateTimeProperty(this.#lastModified)}`)
     }
-    temp.push(`DTSTART${dateWithUTCTime(this.#start, this.#startTz)}`)
+    temp.push(`DTSTART${dateTimeProperty(this.#start, this.#startTz)}`)
 
     if (this.#start === this.#end) {
       // todo хардкод: по-умолчанию длительность 1 час
       temp.push(`DURATION:${'PT1H00M'}`)
     } else {
-      temp.push(`DTEND${dateWithUTCTime(this.#end, this.#endTz)}`)
+      temp.push(`DTEND${dateTimeProperty(this.#end, this.#endTz)}`)
     }
     if (this.#location) {
       temp.push(folding(`LOCATION:${this.#location}`))
@@ -427,10 +430,10 @@ export class VTodo extends VBase implements IBase {
     const temp: string[] = []
     temp.push('BEGIN:VTODO')
     temp.push('UID:' + this.uid)
-    temp.push(`DTSTAMP${dateWithUTCTime(this.stamp)}`)
+    temp.push(`DTSTAMP${dateTimeProperty(this.stamp)}`)
     if (this.#due) {
       // todo поддержать VALUE=DATE если не указано время, а указана только дата
-      temp.push(`DUE;VALUE=DATE-TIME${dateWithUTCTime(this.#due)}`)
+      temp.push(`DUE;VALUE=DATE-TIME${dateTimeProperty(this.#due)}`)
     }
     if (this.#summary) {
       temp.push(folding('SUMMARY:' + this.#summary))
@@ -492,10 +495,10 @@ export class VJournal extends VBase implements IBase {
     temp.push('BEGIN:VJOURNAL')
     temp.push(`UID:${this.uid}`)
     if (this.stamp) {
-      temp.push(`DTSTAMP${dateWithUTCTime(this.stamp)}`)
+      temp.push(`DTSTAMP${dateTimeProperty(this.stamp)}`)
     }
     if (this.#start) {
-      temp.push(`DTSTART${dateWithUTCTime(this.#start)}`)
+      temp.push(`DTSTART${dateTimeProperty(this.#start)}`)
     }
     if (this.#summary) {
       temp.push(folding(`SUMMARY:${this.#summary}`))
@@ -574,7 +577,7 @@ export class VAlarm implements IBase {
     temp.push('ACTION:' + this.#action)
 
     if (this.#description) {
-      temp.push('DESCRIPTION:' + this.#description)
+      temp.push(folding('DESCRIPTION:' + this.#description))
     }
     if (this.#attendee) {
       temp.push(createOrganizer(this.#attendee))
@@ -624,14 +627,14 @@ export class VTimezone implements IBase {
 
     if (this.#standard) {
       temp.push('BEGIN:STANDARD')
-      temp.push(`DTSTART${dateWithUTCTime(this.#standard.start)}`)
+      temp.push(`DTSTART${dateTimeProperty(this.#standard.start)}`)
       temp.push(`TZOFFSETFROM:${this.#standard.tzOffsetFrom}`)
       temp.push(`TZOFFSETTO:${this.#standard.tzOffsetTo}`)
       temp.push('END:STANDARD')
     }
     if (this.#daylight) {
       temp.push('BEGIN:DAYLIGHT')
-      temp.push(`DTSTART${dateWithUTCTime(this.#daylight.start)}`)
+      temp.push(`DTSTART${dateTimeProperty(this.#daylight.start)}`)
       temp.push(`TZOFFSETFROM:${this.#daylight.tzOffsetFrom}`)
       temp.push(`TZOFFSETTO:${this.#daylight.tzOffsetTo}`)
       temp.push('END:DAYLIGHT')

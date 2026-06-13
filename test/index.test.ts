@@ -214,3 +214,22 @@ test('RFC 5545: 75 octets', () => {
   assert.ok(summaryLine, 'SUMMARY line must exist')
   assert.equal(summaryLine, 'SUMMARY:Short', 'Short summary must not be folded')
 })
+
+test('RFC 5545: text newlines are escaped', () => {
+  const description = 'Qweqweqwe\r\nqwe\nqwe\rqwe'
+  const event = new VEvent({
+    start: new Date('2026-06-12T14:35:00Z'),
+    end: new Date('2026-06-12T15:05:00Z'),
+    summary: '222',
+    description,
+  })
+  const calendar = new ICalendar({ id: '-//Secretary//Secretary Calendar API-//' })
+  calendar.addEvent(event)
+
+  assert.ok(calendar.ics.includes('DESCRIPTION:Qweqweqwe\\nqwe\\nqwe\\nqwe'))
+  assert.ok(!calendar.ics.split('\r\n').includes('qwe'))
+
+  const parsed = new ICAL.Component(ICAL.parse(calendar.ics))
+  const parsedEvent = parsed.getFirstSubcomponent('vevent')
+  assert.equal(parsedEvent.getFirstPropertyValue('description'), 'Qweqweqwe\nqwe\nqwe\nqwe')
+})
