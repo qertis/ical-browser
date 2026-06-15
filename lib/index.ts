@@ -4,37 +4,11 @@ import { IBase } from './interfaces'
 
 const BR = '\r\n'
 
-function padTimePart(value: number) {
-  return value.toString().padStart(2, '0')
-}
-
-function dateTimeFromParts({
-  year,
-  month,
-  day,
-  hours,
-  minutes,
-  seconds,
-}: {
-  year: number,
-  month: number,
-  day: number,
-  hours: number,
-  minutes: number,
-  seconds: number,
-}) {
-  return `${year}${padTimePart(month)}${padTimePart(day)}T${padTimePart(hours)}${padTimePart(minutes)}${padTimePart(seconds)}`
-}
-
 function dateWithUTCTime(now: Date) {
-  return dateTimeFromParts({
-    year: now.getUTCFullYear(),
-    month: now.getUTCMonth() + 1,
-    day: now.getUTCDate(),
-    hours: now.getUTCHours(),
-    minutes: now.getUTCMinutes(),
-    seconds: now.getUTCSeconds(),
-  }) + 'Z'
+  const padTimePart = (value: number) => {
+    return value.toString().padStart(2, '0')
+  }
+  return `${now.getUTCFullYear()}${padTimePart(now.getUTCMonth() + 1)}${padTimePart(now.getUTCDate())}T${padTimePart(now.getUTCHours())}${padTimePart(now.getUTCMinutes())}${padTimePart(now.getUTCSeconds())}`
 }
 
 function dateWithTimeZone(now: Date, timezone: string) {
@@ -53,25 +27,9 @@ function dateWithTimeZone(now: Date, timezone: string) {
   return `${byType.year}${byType.month}${byType.day}T${byType.hour}${byType.minute}${byType.second}`
 }
 
-function dateWithFloatingTime(now: Date) {
-  return dateTimeFromParts({
-    year: now.getUTCFullYear(),
-    month: now.getUTCMonth() + 1,
-    day: now.getUTCDate(),
-    hours: now.getUTCHours(),
-    minutes: now.getUTCMinutes(),
-    seconds: now.getUTCSeconds(),
-  })
-}
-
 function dateTimeProperty(now: Date, timezone?: string) {
-  const value = timezone ? dateWithTimeZone(now, timezone) : dateWithUTCTime(now)
-
+  const value = timezone ? dateWithTimeZone(now, timezone) : dateWithUTCTime(now) + 'Z'
   return timezone ? `;TZID=${timezone}:${value}` : `:${value}`
-}
-
-function floatingDateTimeProperty(now: Date) {
-  return ':' + dateWithFloatingTime(now)
 }
 
 function escapeText(value: string) {
@@ -101,10 +59,6 @@ function escapeText(value: string) {
   }
 
   return result
-}
-
-function textProperty(name: string, value: string) {
-  return folding(`${name}:${escapeText(value)}`)
 }
 
 function textListProperty(name: string, values: string[]) {
@@ -147,6 +101,9 @@ function folding(line: string, maxLimit = 75): string {
 }
 
 function createAddressUri(str: string) {
+  if (str.startsWith('https://')) {
+    return str
+  }
   const MAILTO = 'mailto:'
 
   return str.startsWith(MAILTO) ? str : MAILTO + str
@@ -165,46 +122,46 @@ function recurrenceRule({
 }: Rule) {
   const parts: string[] = []
   if (freq) {
-    parts.push('FREQ=' + freq)
+    parts.push(`FREQ=${freq}`)
   }
   if (interval) {
-    parts.push('INTERVAL=' + interval)
+    parts.push(`INTERVAL=${interval}`)
   }
   if (count) {
-    parts.push('COUNT=' + count)
+    parts.push(`COUNT=${count}`)
   }
   if (until) {
-    parts.push('UNTIL=' + dateWithUTCTime(until))
+    parts.push('UNTIL=' + dateWithUTCTime(until) + 'Z')
   }
   if (wkst) {
-    parts.push('WKST=' + wkst)
+    parts.push(`WKST=${wkst}`)
   }
   if (byday) {
     if (Array.isArray(byday)) {
-      parts.push('BYDAY=' + byday.join(','))
+      parts.push(`BYDAY=${byday.join(',')}`)
     } else {
-      parts.push('BYDAY=' + byday)
+      parts.push(`BYDAY=${byday}`)
     }
   }
   if (byweekno) {
     if (Array.isArray(byweekno)) {
-      parts.push('BYWEEKNO=' + byweekno.join(','))
+      parts.push(`BYWEEKNO=${byweekno.join(',')}`)
     } else {
-      parts.push('BYWEEKNO=' + byweekno)
+      parts.push(`BYWEEKNO=${byweekno}`)
     }
   }
   if (bymonthday) {
     if (Array.isArray(bymonthday)) {
-      parts.push('BYMONTHDAY=' + bymonthday.join(','))
+      parts.push(`BYMONTHDAY=${bymonthday.join(',')}`)
     } else {
-      parts.push('BYMONTHDAY=' + bymonthday)
+      parts.push(`BYMONTHDAY=${bymonthday}`)
     }
   }
   if (byyearday) {
     if (Array.isArray(byyearday)) {
-      parts.push('BYYEARDAY=' + byyearday.join(','))
+      parts.push(`BYYEARDAY=${byyearday.join(',')}`)
     } else {
-      parts.push('BYYEARDAY=' + byyearday)
+      parts.push(`BYYEARDAY=${byyearday}`)
     }
   }
 
@@ -265,26 +222,26 @@ function createAttendee(attendee: string | Address | Address[]) {
 }
 
 function createUri(url: URL) {
-  return 'URL;VALUE=URI:' + url.toString()
+  return `URL;VALUE=URI:${url.toString()}`
 }
 
 function createClass(klass: Klass) {
-  return 'CLASS:' + klass.toUpperCase()
+  return `CLASS:${klass.toUpperCase()}`
 }
 
 function createTransp(transp: Transp) {
-  return 'TRANSP:' + transp.toUpperCase()
+  return `TRANSP:${transp.toUpperCase()}`
 }
 
 function createAttach(base64: string) {
   if (!base64.startsWith('data:')) {
-    return 'ATTACH;VALUE=URI:' + base64
+    return `ATTACH;VALUE=URI:${base64}`
   }
 
   const dataUrl = base64.slice('data:'.length)
   const commaIndex = dataUrl.indexOf(',')
   if (commaIndex === -1) {
-    return 'ATTACH;VALUE=URI:' + base64
+    return `ATTACH;VALUE=URI:${base64}`
   }
 
   const meta = dataUrl.slice(0, commaIndex)
@@ -449,16 +406,16 @@ export class VEvent extends VBase implements IBase {
       temp.push(`DTEND${dateTimeProperty(this.#end, this.#endTz)}`)
     }
     if (this.#location) {
-      temp.push(textProperty('LOCATION', this.#location))
+      temp.push(folding(`LOCATION:${escapeText(this.#location)}`))
     }
     if (this.#geo) {
       temp.push(`GEO:${this.#geo[0]};${this.#geo[1]}`)
     }
     if (this.#summary) {
-      temp.push(textProperty('SUMMARY', this.#summary))
+      temp.push(folding(`SUMMARY:${escapeText(this.#summary)}`))
     }
     if (this.#description) {
-      temp.push(textProperty('DESCRIPTION', this.#description))
+      temp.push(folding(`DESCRIPTION:${escapeText(this.#description)}`))
     }
     if (this.#status) {
       temp.push(`STATUS:${this.#status}`)
@@ -500,7 +457,7 @@ export class VEvent extends VBase implements IBase {
       temp.push('RRULE:' + recurrenceRule(this.#rrule))
     }
     for (const key in this.#xProps) {
-      temp.push(textProperty(key.toUpperCase(), String(this.#xProps[key])))
+      temp.push(folding(`${key.toUpperCase()}:${escapeText(String(this.#xProps[key]))}`))
     }
     for (const {ics} of this.#alarms) {
       temp.push(ics)
@@ -569,7 +526,7 @@ export class VTodo extends VBase implements IBase {
       temp.push(`DUE;VALUE=DATE-TIME${dateTimeProperty(this.#due)}`)
     }
     if (this.#summary) {
-      temp.push(textProperty('SUMMARY', this.#summary))
+      temp.push(folding(`SUMMARY:${escapeText(this.#summary)}`))
     }
     if (this.#klass) {
       temp.push(createClass(this.#klass))
@@ -578,7 +535,7 @@ export class VTodo extends VBase implements IBase {
       temp.push(textListProperty('CATEGORIES', this.#categories))
     }
     if (this.#description) {
-      temp.push(textProperty('DESCRIPTION', this.#description))
+      temp.push(folding(`DESCRIPTION:${escapeText(this.#description)}`))
     }
     if (typeof this.#priority === 'number') {
       temp.push('PRIORITY:' + String(this.#priority))
@@ -634,10 +591,10 @@ export class VJournal extends VBase implements IBase {
       temp.push(`DTSTART${dateTimeProperty(this.#start)}`)
     }
     if (this.#summary) {
-      temp.push(textProperty('SUMMARY', this.#summary))
+      temp.push(folding(`SUMMARY:${escapeText(this.#summary)}`))
     }
     if (this.#description) {
-      temp.push(textProperty('DESCRIPTION', this.#description))
+      temp.push(folding(`DESCRIPTION:${escapeText(this.#description)}`))
     }
     if (this.#rrule) {
       temp.push('RRULE:' + recurrenceRule(this.#rrule))
@@ -703,14 +660,14 @@ export class VAlarm implements IBase {
     const temp: string[] = []
     temp.push('BEGIN:VALARM')
     if (this.#trigger.includes(':')) {
-      temp.push('TRIGGER;' + this.#trigger)
+      temp.push(`TRIGGER;${this.#trigger}`)
     } else {
-      temp.push('TRIGGER:' + this.#trigger)
+      temp.push(`TRIGGER:${this.#trigger}`)
     }
-    temp.push('ACTION:' + this.#action)
+    temp.push(`ACTION:${this.#action}`)
 
     if (this.#description) {
-      temp.push(textProperty('DESCRIPTION', this.#description))
+      temp.push(folding(`DESCRIPTION:${escapeText(this.#description)}`))
     }
     if (this.#attendee) {
       temp.push(createAttendee(this.#attendee))
@@ -760,18 +717,18 @@ export class VTimezone implements IBase {
 
     if (this.#standard) {
       temp.push('BEGIN:STANDARD')
-      temp.push(`DTSTART${floatingDateTimeProperty(this.#standard.start)}`)
+      temp.push(`DTSTART:${dateWithUTCTime(this.#standard.start)}`)
       temp.push(`TZOFFSETFROM:${this.#standard.tzOffsetFrom}`)
       temp.push(`TZOFFSETTO:${this.#standard.tzOffsetTo}`)
-      temp.push(textProperty('TZNAME', this.#standard.tzname))
+      temp.push(folding(`TZNAME:${escapeText(this.#standard.tzname)}`))
       temp.push('END:STANDARD')
     }
     if (this.#daylight) {
       temp.push('BEGIN:DAYLIGHT')
-      temp.push(`DTSTART${floatingDateTimeProperty(this.#daylight.start)}`)
+      temp.push(`DTSTART:${dateWithUTCTime(this.#daylight.start)}`)
       temp.push(`TZOFFSETFROM:${this.#daylight.tzOffsetFrom}`)
       temp.push(`TZOFFSETTO:${this.#daylight.tzOffsetTo}`)
-      temp.push(textProperty('TZNAME', this.#daylight.tzname))
+      temp.push(folding(`TZNAME:${escapeText(this.#daylight.tzname)}`))
       temp.push('END:DAYLIGHT')
     }
     temp.push('END:VTIMEZONE')
@@ -835,9 +792,9 @@ export default class ICalendar {
     const temp: string[] = []
     temp.push('BEGIN:VCALENDAR')
     temp.push('VERSION:2.0')
-    temp.push('PRODID:' + this.#prodId)
-    temp.push('CALSCALE:' + this.#calscale)
-    temp.push('METHOD:' + this.#method)
+    temp.push(`PRODID:${this.#prodId}`)
+    temp.push(`CALSCALE:${this.#calscale}`)
+    temp.push(`METHOD:${this.#method}`)
     for (const {ics} of this.#timezones) {
       temp.push(ics)
     }
