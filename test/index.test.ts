@@ -52,10 +52,10 @@ test('icalendar', () => {
     organizer: 'CN=Jane Doe:mailto:no-reply@example.com',
     attendee: [{
       name: 'John Smith',
-      email: 'john.smith@example.com',
+      uri: 'mailto:john.smith@example.com',
     }, {
       name: 'Ann Brown',
-      email: 'ann.brown@example.com',
+      uri: 'mailto:ann.brown@example.com',
     }],
     url: new URL('https://baskovsky.ru#example'),
     klass: 'CONFIDENTIAL',
@@ -244,10 +244,13 @@ test('attendee supports string and address list', () => {
   const eventWithAddressListAttendee = new VEvent({
     start: new Date('2024-06-01T09:00:00Z'),
     end: new Date('2024-06-01T10:00:00Z'),
-    attendee: [
-      { name: 'John Smith', email: 'john.smith@example.com' },
-      { name: 'Ann Brown', email: 'ann.brown@example.com' },
-    ],
+    attendee: [{
+      name: 'John Smith',
+      uri: 'mailto:john.smith@example.com',
+    }, {
+      name: 'Ann Brown',
+      uri: 'mailto:ann.brown@example.com',
+    }],
   })
 
   assert.ok(eventWithAddressListAttendee.ics.includes('ATTENDEE;CN=John Smith:mailto:john.smith@example.com'))
@@ -263,9 +266,18 @@ test('event supports optional end and zero values', () => {
     sequence: 0,
   })
 
-  assert.ok(event.ics.includes('DURATION:PT1H00M'))
+  assert.ok(!event.ics.includes('DURATION:PT1H00M'))
+  assert.ok(!event.ics.includes('DTEND'))
   assert.ok(event.ics.includes('PRIORITY:0'))
   assert.ok(event.ics.includes('SEQUENCE:0'))
+
+  const zeroDurationEvent = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T09:00:00Z'),
+  })
+
+  assert.ok(zeroDurationEvent.ics.includes('DTEND:20240601T090000Z'))
+  assert.ok(!zeroDurationEvent.ics.includes('DURATION:PT1H00M'))
 })
 
 test('text values are escaped', () => {
@@ -294,6 +306,14 @@ test('attachments support data urls and uri values', () => {
   assert.ok(eventWithDataUrl.ics.includes('ATTACH;FMTTYPE=text/plain'))
   assert.ok(eventWithDataUrl.ics.includes(';ENCODING=BASE64;VALUE=BINARY'))
   assert.ok(eventWithDataUrl.ics.includes(':SGVsbG8='))
+
+  const eventWithUppercaseBase64DataUrl = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    attach: 'data:text/plain;BASE64,SGVsbG8=',
+  })
+
+  assert.ok(eventWithUppercaseBase64DataUrl.ics.includes(';ENCODING=BASE64;VALUE=BINARY'))
 
   const eventWithUri = new VEvent({
     start: new Date('2024-06-01T09:00:00Z'),

@@ -146,7 +146,7 @@ function folding(line: string, maxLimit = 75): string {
   return result
 }
 
-function createEmail(str: string) {
+function createAddressUri(str: string) {
   const MAILTO = 'mailto:'
 
   return str.startsWith(MAILTO) ? str : MAILTO + str
@@ -218,16 +218,16 @@ function createOrganizer(organizer: string | Address | Address[]) {
     for (const address of organizer) {
       let org = 'ORGANIZER;'
       org += 'CN=' + address.name
-      if (address.email) {
-        org += `:${createEmail(address.email)}`
+      if (address.uri) {
+        org += `:${createAddressUri(address.uri)}`
       }
       str += org + BR
     }
   } else if (typeof organizer === 'object') {
     let org = 'ORGANIZER;'
     org += 'CN=' + organizer.name
-    if (organizer.email) {
-      org += `:${createEmail(organizer.email)}`
+    if (organizer.uri) {
+      org += `:${createAddressUri(organizer.uri)}`
     }
     str += org
   } else {
@@ -243,16 +243,16 @@ function createAttendee(attendee: string | Address | Address[]) {
     for (const address of attendee) {
       let org = 'ATTENDEE;'
       org += 'CN=' + address.name
-      if (address.email) {
-        org += `:${createEmail(address.email)}`
+      if (address.uri) {
+        org += `:${createAddressUri(address.uri)}`
       }
       str += org + BR
     }
   } else if (typeof attendee === 'object') {
     let org = 'ATTENDEE;'
     org += 'CN=' + attendee.name
-    if (attendee.email) {
-      org += `:${createEmail(attendee.email)}`
+    if (attendee.uri) {
+      org += `:${createAddressUri(attendee.uri)}`
     }
     str += org
   } else {
@@ -290,12 +290,12 @@ function createAttach(base64: string) {
   const meta = dataUrl.slice(0, commaIndex)
   const data = dataUrl.slice(commaIndex + 1)
   const [type, ...params] = meta.split(';')
-  const encoding = params.find(param => param.toUpperCase() === 'BASE64')
+  const isBase64 = params.some(param => param.toUpperCase() === 'BASE64')
   let str = 'ATTACH'
   str += ';FMTTYPE=' + type
   str += ';FILENAME=' + globalThis.crypto.randomUUID() + '.' + extension(type)
-  if (encoding && encoding.toUpperCase() !== 'BASE64') {
-    str += ';ENCODING=' + encoding.toUpperCase()
+  if (isBase64) {
+    str += ';ENCODING=BASE64'
     str += ';VALUE=' + 'BINARY'
   }
   str += ':' + data
@@ -316,7 +316,7 @@ class VBase {
 export class VEvent extends VBase implements IBase {
   #start: Date
   #startTz?: string
-  #end: Date
+  #end?: Date
   #endTz?: string
   #location?: string
   #geo?: number[]
@@ -365,13 +365,15 @@ export class VEvent extends VBase implements IBase {
       throw new Error('start must be a Date object')
     }
     this.#start = start
-    if (!(end instanceof Date)) {
+    if (end !== undefined && !(end instanceof Date)) {
       throw new Error('end must be a Date object')
     }
     if (startTz) {
       this.#startTz = startTz
     }
-    this.#end = end
+    if (end !== undefined) {
+      this.#end = end
+    }
     if (endTz) {
       this.#endTz = endTz
     }
@@ -443,10 +445,7 @@ export class VEvent extends VBase implements IBase {
     }
     temp.push(`DTSTART${dateTimeProperty(this.#start, this.#startTz)}`)
 
-    if (this.#start === this.#end) {
-      // todo хардкод: по-умолчанию длительность 1 час
-      temp.push(`DURATION:${'PT1H00M'}`)
-    } else {
+    if (this.#end !== undefined) {
       temp.push(`DTEND${dateTimeProperty(this.#end, this.#endTz)}`)
     }
     if (this.#location) {

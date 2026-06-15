@@ -1,6 +1,6 @@
 export type Address = {
   name: string
-  email: string
+  uri: string
 }
 
 export enum Day {
