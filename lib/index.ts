@@ -4,22 +4,111 @@ import { IBase } from './interfaces'
 
 const BR = '\r\n'
 
-// Date conversion to Date UTC Time standard
-function dateWithUTCTime(now: Date, timezone?: string) {
-  const year = now.getUTCFullYear()
-  const month = (now.getUTCMonth() + 1).toString().padStart(2, '0')
-  const day = now.getUTCDate().toString().padStart(2, '0')
-  const hours = now.getUTCHours().toString().padStart(2, '0')
-  const minutes = now.getUTCMinutes().toString().padStart(2, '0')
-  const seconds = now.getUTCSeconds().toString().padStart(2, '0')
+function padTimePart(value: number) {
+  return value.toString().padStart(2, '0')
+}
 
-  return `${year}${month}${day}T${hours}${minutes}${seconds}${timezone ? '' : 'Z'}`
+function dateTimeFromParts({
+  year,
+  month,
+  day,
+  hours,
+  minutes,
+  seconds,
+}: {
+  year: number,
+  month: number,
+  day: number,
+  hours: number,
+  minutes: number,
+  seconds: number,
+}) {
+  return `${year}${padTimePart(month)}${padTimePart(day)}T${padTimePart(hours)}${padTimePart(minutes)}${padTimePart(seconds)}`
+}
+
+function dateWithUTCTime(now: Date) {
+  return dateTimeFromParts({
+    year: now.getUTCFullYear(),
+    month: now.getUTCMonth() + 1,
+    day: now.getUTCDate(),
+    hours: now.getUTCHours(),
+    minutes: now.getUTCMinutes(),
+    seconds: now.getUTCSeconds(),
+  }) + 'Z'
+}
+
+function dateWithTimeZone(now: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now)
+  const byType = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+
+  return `${byType.year}${byType.month}${byType.day}T${byType.hour}${byType.minute}${byType.second}`
+}
+
+function dateWithFloatingTime(now: Date) {
+  return dateTimeFromParts({
+    year: now.getUTCFullYear(),
+    month: now.getUTCMonth() + 1,
+    day: now.getUTCDate(),
+    hours: now.getUTCHours(),
+    minutes: now.getUTCMinutes(),
+    seconds: now.getUTCSeconds(),
+  })
 }
 
 function dateTimeProperty(now: Date, timezone?: string) {
-  const value = dateWithUTCTime(now, timezone)
+  const value = timezone ? dateWithTimeZone(now, timezone) : dateWithUTCTime(now)
 
   return timezone ? `;TZID=${timezone}:${value}` : `:${value}`
+}
+
+function floatingDateTimeProperty(now: Date) {
+  return ':' + dateWithFloatingTime(now)
+}
+
+function escapeText(value: string) {
+  let result = ''
+
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i]
+    const next = value[i + 1]
+
+    if (char === '\r' || char === '\n') {
+      if (char === '\r' && next === '\n') {
+        i++
+      }
+      result += '\\n'
+    } else if (char === '\\') {
+      if (next && ['n', 'N', ';', ',', '\\'].includes(next)) {
+        result += char + next
+        i++
+      } else {
+        result += '\\\\'
+      }
+    } else if (char === ';' || char === ',') {
+      result += '\\' + char
+    } else {
+      result += char
+    }
+  }
+
+  return result
+}
+
+function textProperty(name: string, value: string) {
+  return folding(`${name}:${escapeText(value)}`)
+}
+
+function textListProperty(name: string, values: string[]) {
+  return folding(`${name}:${values.map(escapeText).join(',')}`)
 }
 
 // RFC 5545: lines MUST NOT be longer than 75 octets (bytes), excluding the line break.
@@ -74,46 +163,52 @@ function recurrenceRule({
   bymonthday,
   byyearday,
 }: Rule) {
-  let outStr = ''
+  const parts: string[] = []
   if (freq) {
-    outStr += 'FREQ=' + freq + ';'
+    parts.push('FREQ=' + freq)
   }
   if (interval) {
-    outStr += 'INTERVAL=' + interval + ';'
+    parts.push('INTERVAL=' + interval)
   }
   if (count) {
-    outStr += 'COUNT=' + count + ';'
+    parts.push('COUNT=' + count)
   }
   if (until) {
-    outStr += 'UNTIL=' + dateWithUTCTime(until) + ';'
+    parts.push('UNTIL=' + dateWithUTCTime(until))
   }
-  outStr += wkst + ';'
+  if (wkst) {
+    parts.push('WKST=' + wkst)
+  }
   if (byday) {
-    outStr += 'BYDAY='
     if (Array.isArray(byday)) {
-      outStr += byday.join(',')
+      parts.push('BYDAY=' + byday.join(','))
     } else {
-      outStr += byday
+      parts.push('BYDAY=' + byday)
     }
-    outStr += ';'
   }
   if (byweekno) {
-    outStr += 'BYWEEKNO' + byweekno + ';'
+    if (Array.isArray(byweekno)) {
+      parts.push('BYWEEKNO=' + byweekno.join(','))
+    } else {
+      parts.push('BYWEEKNO=' + byweekno)
+    }
   }
   if (bymonthday) {
-    outStr += 'BYMONTHDAY='
     if (Array.isArray(bymonthday)) {
-      outStr += bymonthday.join(',')
+      parts.push('BYMONTHDAY=' + bymonthday.join(','))
     } else {
-      outStr += bymonthday
+      parts.push('BYMONTHDAY=' + bymonthday)
     }
-    outStr += ';'
   }
   if (byyearday) {
-    outStr += 'BYYEARDAY' + byyearday + ';'
+    if (Array.isArray(byyearday)) {
+      parts.push('BYYEARDAY=' + byyearday.join(','))
+    } else {
+      parts.push('BYYEARDAY=' + byyearday)
+    }
   }
 
-  return outStr
+  return parts.join(';')
 }
 
 function createOrganizer(organizer: string | Address | Address[]) {
@@ -161,7 +256,9 @@ function createAttendee(attendee: string | Address | Address[]) {
     }
     str += org
   } else {
-    str += `ATTENDEE:${attendee}`
+    str += attendee.includes(':') && !attendee.startsWith('mailto:')
+      ? `ATTENDEE;${attendee}`
+      : `ATTENDEE:${attendee}`
   }
 
   return str
@@ -180,13 +277,25 @@ function createTransp(transp: Transp) {
 }
 
 function createAttach(base64: string) {
-  const [type, temp] = base64.split('data:')[1].split(';')
-  const [encoding, data] = temp.split(',')
+  if (!base64.startsWith('data:')) {
+    return 'ATTACH;VALUE=URI:' + base64
+  }
+
+  const dataUrl = base64.slice('data:'.length)
+  const commaIndex = dataUrl.indexOf(',')
+  if (commaIndex === -1) {
+    return 'ATTACH;VALUE=URI:' + base64
+  }
+
+  const meta = dataUrl.slice(0, commaIndex)
+  const data = dataUrl.slice(commaIndex + 1)
+  const [type, ...params] = meta.split(';')
+  const encoding = params.find(param => param.toUpperCase() === 'BASE64')
   let str = 'ATTACH'
   str += ';FMTTYPE=' + type
   str += ';FILENAME=' + globalThis.crypto.randomUUID() + '.' + extension(type)
-  str += ';ENCODING=' + encoding.toUpperCase()
-  if (encoding.toUpperCase() !== 'BASE64') {
+  if (encoding && encoding.toUpperCase() !== 'BASE64') {
+    str += ';ENCODING=' + encoding.toUpperCase()
     str += ';VALUE=' + 'BINARY'
   }
   str += ':' + data
@@ -216,8 +325,8 @@ export class VEvent extends VBase implements IBase {
   #status?: string
   #categories?: string[]
   #priority?: number
-  #organizer?: string | Address[]
-  #attendee?: string | Address[]
+  #organizer?: string | Address | Address[]
+  #attendee?: string | Address | Address[]
   #attach?: string | string[]
   #url?: URL
   #klass?: Klass
@@ -284,7 +393,7 @@ export class VEvent extends VBase implements IBase {
     if (categories) {
       this.#categories = categories
     }
-    if (priority) {
+    if (typeof priority === 'number') {
       this.#priority = priority
     }
     if (organizer) {
@@ -305,7 +414,7 @@ export class VEvent extends VBase implements IBase {
     if (transp) {
       this.#transp = transp
     }
-    if (sequence) {
+    if (typeof sequence === 'number') {
       this.#sequence = sequence
     }
     if (rrule) {
@@ -341,24 +450,24 @@ export class VEvent extends VBase implements IBase {
       temp.push(`DTEND${dateTimeProperty(this.#end, this.#endTz)}`)
     }
     if (this.#location) {
-      temp.push(folding(`LOCATION:${this.#location}`))
+      temp.push(textProperty('LOCATION', this.#location))
     }
     if (this.#geo) {
       temp.push(`GEO:${this.#geo[0]};${this.#geo[1]}`)
     }
     if (this.#summary) {
-      temp.push(folding(`SUMMARY:${this.#summary}`))
+      temp.push(textProperty('SUMMARY', this.#summary))
     }
     if (this.#description) {
-      temp.push(folding(`DESCRIPTION:${this.#description}`))
+      temp.push(textProperty('DESCRIPTION', this.#description))
     }
     if (this.#status) {
       temp.push(`STATUS:${this.#status}`)
     }
     if (this.#categories) {
-      temp.push(`CATEGORIES:${this.#categories}`)
+      temp.push(textListProperty('CATEGORIES', this.#categories))
     }
-    if (this.#priority) {
+    if (typeof this.#priority === 'number') {
       temp.push(`PRIORITY:${this.#priority}`)
     }
     if (this.#organizer) {
@@ -370,10 +479,10 @@ export class VEvent extends VBase implements IBase {
     if (this.#attach) {
       if (Array.isArray(this.#attach)) {
         for (const base64 of this.#attach) {
-          temp.push(createAttach(base64))
+          temp.push(folding(createAttach(base64)))
         }
       } else {
-        temp.push(createAttach(this.#attach))
+        temp.push(folding(createAttach(this.#attach)))
       }
     }
     if (this.#url) {
@@ -385,14 +494,14 @@ export class VEvent extends VBase implements IBase {
     if (this.#transp) {
       temp.push(createTransp(this.#transp))
     }
-    if (this.#sequence) {
+    if (typeof this.#sequence === 'number') {
       temp.push(`SEQUENCE:${this.#sequence}`)
     }
     if (this.#rrule) {
       temp.push('RRULE:' + recurrenceRule(this.#rrule))
     }
     for (const key in this.#xProps) {
-      temp.push(`${key.toUpperCase()}:${this.#xProps[key]}`)
+      temp.push(textProperty(key.toUpperCase(), String(this.#xProps[key])))
     }
     for (const {ics} of this.#alarms) {
       temp.push(ics)
@@ -443,7 +552,7 @@ export class VTodo extends VBase implements IBase {
     if (klass) {
       this.#klass = klass
     }
-    if (priority) {
+    if (typeof priority === 'number') {
       this.#priority = priority
     }
     if (rrule) {
@@ -461,18 +570,18 @@ export class VTodo extends VBase implements IBase {
       temp.push(`DUE;VALUE=DATE-TIME${dateTimeProperty(this.#due)}`)
     }
     if (this.#summary) {
-      temp.push(folding('SUMMARY:' + this.#summary))
+      temp.push(textProperty('SUMMARY', this.#summary))
     }
     if (this.#klass) {
       temp.push(createClass(this.#klass))
     }
     if (this.#categories) {
-      temp.push(`CATEGORIES:${this.#categories}`)
+      temp.push(textListProperty('CATEGORIES', this.#categories))
     }
     if (this.#description) {
-      temp.push(folding('DESCRIPTION:' + this.#description))
+      temp.push(textProperty('DESCRIPTION', this.#description))
     }
-    if (this.#priority) {
+    if (typeof this.#priority === 'number') {
       temp.push('PRIORITY:' + String(this.#priority))
     }
     if (this.#status) {
@@ -526,10 +635,10 @@ export class VJournal extends VBase implements IBase {
       temp.push(`DTSTART${dateTimeProperty(this.#start)}`)
     }
     if (this.#summary) {
-      temp.push(folding(`SUMMARY:${this.#summary}`))
+      temp.push(textProperty('SUMMARY', this.#summary))
     }
     if (this.#description) {
-      temp.push(folding(`DESCRIPTION:${this.#description}`))
+      temp.push(textProperty('DESCRIPTION', this.#description))
     }
     if (this.#rrule) {
       temp.push('RRULE:' + recurrenceRule(this.#rrule))
@@ -545,7 +654,7 @@ export class VAlarm implements IBase {
   #trigger: string
   #description?: string
   #attach?: string
-  #attendee?: string | Address[]
+  #attendee?: string | Address | Address[]
 
   constructor(data: Alarm) {
     const { action, description, trigger, attach, attendee} = data
@@ -602,13 +711,13 @@ export class VAlarm implements IBase {
     temp.push('ACTION:' + this.#action)
 
     if (this.#description) {
-      temp.push(folding('DESCRIPTION:' + this.#description))
+      temp.push(textProperty('DESCRIPTION', this.#description))
     }
     if (this.#attendee) {
       temp.push(createAttendee(this.#attendee))
     }
     if (this.#attach) {
-      temp.push(createAttach(this.#attach))
+      temp.push(folding(createAttach(this.#attach)))
     }
     temp.push('END:VALARM')
 
@@ -652,16 +761,18 @@ export class VTimezone implements IBase {
 
     if (this.#standard) {
       temp.push('BEGIN:STANDARD')
-      temp.push(`DTSTART${dateTimeProperty(this.#standard.start)}`)
+      temp.push(`DTSTART${floatingDateTimeProperty(this.#standard.start)}`)
       temp.push(`TZOFFSETFROM:${this.#standard.tzOffsetFrom}`)
       temp.push(`TZOFFSETTO:${this.#standard.tzOffsetTo}`)
+      temp.push(textProperty('TZNAME', this.#standard.tzname))
       temp.push('END:STANDARD')
     }
     if (this.#daylight) {
       temp.push('BEGIN:DAYLIGHT')
-      temp.push(`DTSTART${dateTimeProperty(this.#daylight.start)}`)
+      temp.push(`DTSTART${floatingDateTimeProperty(this.#daylight.start)}`)
       temp.push(`TZOFFSETFROM:${this.#daylight.tzOffsetFrom}`)
       temp.push(`TZOFFSETTO:${this.#daylight.tzOffsetTo}`)
+      temp.push(textProperty('TZNAME', this.#daylight.tzname))
       temp.push('END:DAYLIGHT')
     }
     temp.push('END:VTIMEZONE')

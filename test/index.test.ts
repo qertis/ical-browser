@@ -92,9 +92,12 @@ test('icalendar', () => {
   assert.ok(!event.includes('ORGANIZER;CN=John Smith:mailto:john.smith@example.com'))
   assert.ok(event.includes('X-CUSTOM:custom'))
   assert.ok(event.includes('X-FOO:bar'))
-  assert.ok(event.includes('DTSTART;TZID=America/New_York:20240101T101000'))
+  assert.ok(event.includes('DTSTART;TZID=America/New_York:20240101T051000'))
+  assert.ok(event.includes('DTEND;TZID=America/New_York:20240102T051200'))
   assert.ok(event.includes('LAST-MODIFIED:20240730T072628Z'))
-  assert.ok(event.includes('RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=10;UNTIL=20241231T235959Z;MO;BYDAY=MO,WE,FR;BYWEEKNO10,20;BYMONTHDAY=5,15,25;BYYEARDAY100,200;'))
+  assert.ok(event.includes('RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=10;UNTIL=20241231T235959Z;WKST=MO;BYDAY=MO,WE,FR;BYWEEKNO=10,20;BYMONTHDAY=5,15,25;BYYEARDAY=100,200'))
+  assert.ok(!event.includes('BYWEEKNO10,20'))
+  assert.ok(!event.includes('BYYEARDAY100,200'))
 
   const vtodo = new VTodo({
     uid: '2345678901',
@@ -130,6 +133,9 @@ test('icalendar', () => {
   assert.ok(ics.includes('BEGIN:VJOURNAL'))
   assert.ok(ics.includes('END:VJOURNAL'))
   assert.ok(ics.includes('BEGIN:VALARM'))
+  assert.ok(ics.includes('DTSTART:20231105T020000'))
+  assert.ok(ics.includes('TZNAME:EST'))
+  assert.ok(ics.includes('TZNAME:EDT'))
   assert.ok(ics.includes('END:VCALENDAR'))
 
   const icalData = ICAL.parse(calendar.ics)
@@ -232,7 +238,7 @@ test('attendee supports string and address list', () => {
     attendee: 'CN=John Smith:mailto:john.smith@example.com',
   })
 
-  assert.ok(eventWithStringAttendee.ics.includes('ATTENDEE:CN=John Smith:mailto:john.smith@example.com'))
+  assert.ok(eventWithStringAttendee.ics.includes('ATTENDEE;CN=John Smith:mailto:john.smith@example.com'))
   assert.ok(!eventWithStringAttendee.ics.includes('ORGANIZER:CN=John Smith:mailto:john.smith@example.com'))
 
   const eventWithAddressListAttendee = new VEvent({
@@ -248,6 +254,54 @@ test('attendee supports string and address list', () => {
   assert.ok(eventWithAddressListAttendee.ics.includes('ATTENDEE;CN=Ann Brown:mailto:ann.brown@example.com'))
   assert.ok(!eventWithAddressListAttendee.ics.includes('ORGANIZER;CN=John Smith:mailto:john.smith@example.com'))
   assert.ok(!eventWithAddressListAttendee.ics.includes('ORGANIZER;CN=Ann Brown:mailto:ann.brown@example.com'))
+})
+
+test('event supports optional end and zero values', () => {
+  const event = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    priority: 0,
+    sequence: 0,
+  })
+
+  assert.ok(event.ics.includes('DURATION:PT1H00M'))
+  assert.ok(event.ics.includes('PRIORITY:0'))
+  assert.ok(event.ics.includes('SEQUENCE:0'))
+})
+
+test('text values are escaped', () => {
+  const event = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    summary: 'Meeting, planning; Q\\A',
+    location: 'Room 1, Floor 2',
+    categories: ['team,calendar', 'planning;review'],
+    'x-custom': 'a,b;c',
+  })
+
+  assert.ok(event.ics.includes('SUMMARY:Meeting\\, planning\\; Q\\\\A'))
+  assert.ok(event.ics.includes('LOCATION:Room 1\\, Floor 2'))
+  assert.ok(event.ics.includes('CATEGORIES:team\\,calendar,planning\\;review'))
+  assert.ok(event.ics.includes('X-CUSTOM:a\\,b\\;c'))
+})
+
+test('attachments support data urls and uri values', () => {
+  const eventWithDataUrl = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    attach: 'data:text/plain;base64,SGVsbG8=',
+  })
+
+  assert.ok(eventWithDataUrl.ics.includes('ATTACH;FMTTYPE=text/plain'))
+  assert.ok(eventWithDataUrl.ics.includes(';ENCODING=BASE64;VALUE=BINARY'))
+  assert.ok(eventWithDataUrl.ics.includes(':SGVsbG8='))
+
+  const eventWithUri = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    attach: 'https://example.com/file.txt',
+  })
+
+  assert.ok(eventWithUri.ics.includes('ATTACH;VALUE=URI:https://example.com/file.txt'))
 })
 
 test('RFC 5545: text newlines are escaped', () => {

@@ -17,14 +17,14 @@ export type RuleFreq = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
 
 export type Rule = {
   freq: RuleFreq
-  count: number
-  interval: number
-  until: Date
-  wkst: 'MO' | 'SU'
-  byday: Day | Day[]
-  byweekno: number
-  bymonthday: number | number[]
-  byyearday: number
+  count?: number
+  interval?: number
+  until?: Date
+  wkst?: 'MO' | 'SU'
+  byday?: Day | Day[]
+  byweekno?: number | number[]
+  bymonthday?: number | number[]
+  byyearday?: number | number[]
 }
 
 export type EventStatus = 'TENTATIVE' | 'CONFIRMED' | 'CANCELLED'
@@ -40,13 +40,13 @@ export interface Event {
   summary?: string
   description?: string
   stamp?: Date
-  start?: Date
+  start: Date
   startTz?: string
   endTz?: string
   end?: Date
   attach?: string | string[]
-  organizer?: string | Address[]
-  attendee?: string | Address[]
+  organizer?: string | Address | Address[]
+  attendee?: string | Address | Address[]
   url?: URL
   status?: EventStatus
   categories?: string[]
@@ -90,7 +90,7 @@ export interface Alarm {
   description?: string
   trigger?: string
   attach?: string
-  attendee?: string | Address[]
+  attendee?: string | Address | Address[]
 }
 
 export interface Timezone {
