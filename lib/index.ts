@@ -142,6 +142,31 @@ function createOrganizer(organizer: string | Address | Address[]) {
   return str
 }
 
+function createAttendee(attendee: string | Address | Address[]) {
+  let str = ''
+  if (Array.isArray(attendee)) {
+    for (const address of attendee) {
+      let org = 'ATTENDEE;'
+      org += 'CN=' + address.name
+      if (address.email) {
+        org += `:${createEmail(address.email)}`
+      }
+      str += org + BR
+    }
+  } else if (typeof attendee === 'object') {
+    let org = 'ATTENDEE;'
+    org += 'CN=' + attendee.name
+    if (attendee.email) {
+      org += `:${createEmail(attendee.email)}`
+    }
+    str += org
+  } else {
+    str += `ATTENDEE:${attendee}`
+  }
+
+  return str
+}
+
 function createUri(url: URL) {
   return 'URL;VALUE=URI:' + url.toString()
 }
@@ -340,7 +365,7 @@ export class VEvent extends VBase implements IBase {
       temp.push(createOrganizer(this.#organizer))
     }
     if (this.#attendee) {
-      temp.push(createOrganizer(this.#attendee))
+      temp.push(createAttendee(this.#attendee))
     }
     if (this.#attach) {
       if (Array.isArray(this.#attach)) {
@@ -580,7 +605,7 @@ export class VAlarm implements IBase {
       temp.push(folding('DESCRIPTION:' + this.#description))
     }
     if (this.#attendee) {
-      temp.push(createOrganizer(this.#attendee))
+      temp.push(createAttendee(this.#attendee))
     }
     if (this.#attach) {
       temp.push(createAttach(this.#attach))

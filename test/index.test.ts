@@ -50,7 +50,13 @@ test('icalendar', () => {
       'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEAAAAACwAAAAAAQABAAACAkQBADs='
     ],
     organizer: 'CN=Jane Doe:mailto:no-reply@example.com',
-    attendee: 'CN=John Smith:mailto:john.smith@example.com',
+    attendee: [{
+      name: 'John Smith',
+      email: 'john.smith@example.com',
+    }, {
+      name: 'Ann Brown',
+      email: 'ann.brown@example.com',
+    }],
     url: new URL('https://baskovsky.ru#example'),
     klass: 'CONFIDENTIAL',
     transp: 'TRANSPARENT',
@@ -80,6 +86,10 @@ test('icalendar', () => {
   assert.ok(event.includes('CLASS:CONFIDENTIAL'))
   assert.ok(event.includes('TRANSP:TRANSPARENT'))
   assert.ok(event.includes('SEQUENCE:1'))
+  assert.ok(event.includes('ORGANIZER:CN=Jane Doe:mailto:no-reply@example.com'))
+  assert.ok(event.includes('ATTENDEE;CN=John Smith:mailto:john.smith@example.com'))
+  assert.ok(event.includes('ATTENDEE;CN=Ann Brown:mailto:ann.brown@example.com'))
+  assert.ok(!event.includes('ORGANIZER;CN=John Smith:mailto:john.smith@example.com'))
   assert.ok(event.includes('X-CUSTOM:custom'))
   assert.ok(event.includes('X-FOO:bar'))
   assert.ok(event.includes('DTSTART;TZID=America/New_York:20240101T101000'))
@@ -213,6 +223,31 @@ test('RFC 5545: 75 octets', () => {
   const summaryLine = shortLines.find(l => l.startsWith('SUMMARY:'))
   assert.ok(summaryLine, 'SUMMARY line must exist')
   assert.equal(summaryLine, 'SUMMARY:Short', 'Short summary must not be folded')
+})
+
+test('attendee supports string and address list', () => {
+  const eventWithStringAttendee = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    attendee: 'CN=John Smith:mailto:john.smith@example.com',
+  })
+
+  assert.ok(eventWithStringAttendee.ics.includes('ATTENDEE:CN=John Smith:mailto:john.smith@example.com'))
+  assert.ok(!eventWithStringAttendee.ics.includes('ORGANIZER:CN=John Smith:mailto:john.smith@example.com'))
+
+  const eventWithAddressListAttendee = new VEvent({
+    start: new Date('2024-06-01T09:00:00Z'),
+    end: new Date('2024-06-01T10:00:00Z'),
+    attendee: [
+      { name: 'John Smith', email: 'john.smith@example.com' },
+      { name: 'Ann Brown', email: 'ann.brown@example.com' },
+    ],
+  })
+
+  assert.ok(eventWithAddressListAttendee.ics.includes('ATTENDEE;CN=John Smith:mailto:john.smith@example.com'))
+  assert.ok(eventWithAddressListAttendee.ics.includes('ATTENDEE;CN=Ann Brown:mailto:ann.brown@example.com'))
+  assert.ok(!eventWithAddressListAttendee.ics.includes('ORGANIZER;CN=John Smith:mailto:john.smith@example.com'))
+  assert.ok(!eventWithAddressListAttendee.ics.includes('ORGANIZER;CN=Ann Brown:mailto:ann.brown@example.com'))
 })
 
 test('RFC 5545: text newlines are escaped', () => {
