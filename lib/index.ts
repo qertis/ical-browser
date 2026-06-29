@@ -1,5 +1,5 @@
 import { extension } from 'mime-types'
-import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale } from './types'
+import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType } from './types'
 import { IBase } from './interfaces'
 
 const BR = '\r\n'
@@ -260,6 +260,18 @@ function createAttach(base64: string) {
   return str
 }
 
+function validateXProps(xProps?: { [xKey: string]: string }) {
+  if (xProps && Object.keys(xProps).some(key => !key.toUpperCase().startsWith('X-'))) {
+    throw new Error('xProps keys must start with X-')
+  }
+}
+
+function validateFreeBusyType(type?: FreeBusyType) {
+  if (type && type !== 'FREE' && type !== 'BUSY' && type !== 'BUSY-TENTATIVE' && type !== 'BUSY-UNAVAILABLE') {
+    throw new Error('freeBusy period type must be FREE, BUSY, BUSY-TENTATIVE or BUSY-UNAVAILABLE')
+  }
+}
+
 class VBase {
   protected uid: string
   protected stamp: Date
@@ -468,6 +480,153 @@ export class VEvent extends VBase implements IBase {
   }
 }
 
+export class VFreeBusy extends VBase implements IBase {
+  #start?: Date
+  #end?: Date
+  #organizer?: string | Address | Address[]
+  #attendee?: string | Address | Address[]
+  #contact?: string | string[]
+  #comment?: string | string[]
+  #url?: URL | string
+  #freeBusy: FreeBusyPeriod[]
+  #xProps?: { [xKey: string]: string } = {}
+
+  constructor(data: FreeBusy) {
+    super(data)
+    const {
+      start,
+      end,
+      organizer,
+      attendee,
+      contact,
+      comment,
+      url,
+      freeBusy,
+      xProps,
+    } = data
+
+    if (!freeBusy || freeBusy.length === 0) {
+      throw new Error('freeBusy must contain at least one period')
+    }
+    if (start && !(start instanceof Date)) {
+      throw new Error('start must be a Date object')
+    }
+    if (end && !(end instanceof Date)) {
+      throw new Error('end must be a Date object')
+    }
+    if (start && end && end <= start) {
+      throw new Error('end must be after start')
+    }
+    for (const period of freeBusy) {
+      this.#validatePeriod(period)
+    }
+    validateXProps(xProps)
+
+    if (start) {
+      this.#start = start
+    }
+    if (end) {
+      this.#end = end
+    }
+    if (organizer) {
+      this.#organizer = organizer
+    }
+    if (attendee) {
+      this.#attendee = attendee
+    }
+    if (contact) {
+      this.#contact = contact
+    }
+    if (comment) {
+      this.#comment = comment
+    }
+    if (url) {
+      this.#url = url
+    }
+    this.#freeBusy = freeBusy
+    if (xProps) {
+      this.#xProps = xProps
+    }
+  }
+
+  #validatePeriod(period: FreeBusyPeriod) {
+    if (!(period.start instanceof Date)) {
+      throw new Error('freeBusy period start must be a Date object')
+    }
+    if (!period.end && !period.duration) {
+      throw new Error('freeBusy period must include either end or duration')
+    }
+    if (period.end && period.duration) {
+      throw new Error('freeBusy period must not include both end and duration')
+    }
+    if (period.end && !(period.end instanceof Date)) {
+      throw new Error('freeBusy period end must be a Date object')
+    }
+    if (period.end && period.end <= period.start) {
+      throw new Error('freeBusy period end must be after start')
+    }
+    validateFreeBusyType(period.type)
+  }
+
+  #pushAddress(temp: string[], value: string) {
+    for (const line of value.split(BR).filter(Boolean)) {
+      temp.push(folding(line))
+    }
+  }
+
+  #pushText(temp: string[], name: string, value: string | string[]) {
+    const values = Array.isArray(value) ? value : [value]
+    for (const item of values) {
+      temp.push(folding(`${name}:${escapeText(item)}`))
+    }
+  }
+
+  #freeBusyLine(period: FreeBusyPeriod) {
+    const params = period.type ? `;FBTYPE=${period.type}` : ''
+    const start = dateWithUTCTime(period.start) + 'Z'
+    const end = period.end ? dateWithUTCTime(period.end) + 'Z' : period.duration
+
+    return `FREEBUSY${params}:${start}/${end}`
+  }
+
+  get ics() {
+    const temp: string[] = []
+    temp.push('BEGIN:VFREEBUSY')
+    temp.push(`UID:${this.uid}`)
+    temp.push(`DTSTAMP${dateTimeProperty(this.stamp)}`)
+    if (this.#start) {
+      temp.push(`DTSTART${dateTimeProperty(this.#start)}`)
+    }
+    if (this.#end) {
+      temp.push(`DTEND${dateTimeProperty(this.#end)}`)
+    }
+    if (this.#organizer) {
+      this.#pushAddress(temp, createOrganizer(this.#organizer))
+    }
+    if (this.#attendee) {
+      this.#pushAddress(temp, createAttendee(this.#attendee))
+    }
+    if (this.#contact) {
+      this.#pushText(temp, 'CONTACT', this.#contact)
+    }
+    if (this.#comment) {
+      this.#pushText(temp, 'COMMENT', this.#comment)
+    }
+    if (this.#url) {
+      temp.push(folding(this.#url instanceof URL ? createUri(this.#url) : `URL:${this.#url}`))
+    }
+    for (const period of this.#freeBusy) {
+      temp.push(folding(this.#freeBusyLine(period)))
+    }
+    for (const key in this.#xProps) {
+      temp.push(folding(`${key.toUpperCase()}:${escapeText(this.#xProps[key])}`))
+    }
+    temp.push('END:VFREEBUSY')
+
+    return temp.join(BR)
+  }
+}
+
 export class VTodo extends VBase implements IBase {
   #due?: Date
   #summary?: string
@@ -637,9 +796,7 @@ export class VAlarm implements IBase {
     if ((duration && repeat === undefined) || (!duration && repeat !== undefined)) {
       throw new Error('duration and repeat must be used together')
     }
-    if (xProps && Object.keys(xProps).some(key => !key.toUpperCase().startsWith('X-'))) {
-      throw new Error('xProps keys must start with X-')
-    }
+    validateXProps(xProps)
 
     switch (normalizedAction) {
       case 'DISPLAY': {
@@ -823,6 +980,7 @@ export default class ICalendar {
   #todos: VTodo[]
   #journals: VJournal[]
   #timezones: VTimezone[]
+  #freeBusy: VFreeBusy[]
 
   #prodId: string
   #calscale: string
@@ -851,6 +1009,7 @@ export default class ICalendar {
     this.#todos = []
     this.#journals = []
     this.#timezones = []
+    this.#freeBusy = []
   }
 
   addEvent(event: VEvent) {
@@ -869,6 +1028,13 @@ export default class ICalendar {
     this.#timezones.push(timezone)
   }
 
+  addFreeBusy(freeBusy: VFreeBusy) {
+    if (!(freeBusy instanceof VFreeBusy)) {
+      throw new Error('freeBusy must be an instance of VFreeBusy')
+    }
+    this.#freeBusy.push(freeBusy)
+  }
+
   get ics() {
     const temp: string[] = []
     temp.push('BEGIN:VCALENDAR')
@@ -877,6 +1043,9 @@ export default class ICalendar {
     temp.push(`CALSCALE:${this.#calscale}`)
     temp.push(`METHOD:${this.#method}`)
     for (const {ics} of this.#timezones) {
+      temp.push(ics)
+    }
+    for (const {ics} of this.#freeBusy) {
       temp.push(ics)
     }
     for (const {ics} of this.#events) {

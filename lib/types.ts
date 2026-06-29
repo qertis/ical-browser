@@ -33,6 +33,30 @@ export type Klass = 'PUBLIC' | 'PRIVATE' | 'CONFIDENTIAL'
 
 export type Transp = 'TRANSPARENT' | 'OPAQUE'
 
+export type FreeBusyType = 'FREE' | 'BUSY' | 'BUSY-TENTATIVE' | 'BUSY-UNAVAILABLE'
+
+export interface FreeBusyPeriod {
+  start: Date
+  end?: Date
+  // Must be an iCalendar duration string, for example PT1H or P1D.
+  duration?: string
+  type?: FreeBusyType
+}
+
+export interface FreeBusy {
+  uid?: string
+  stamp?: Date
+  start?: Date
+  end?: Date
+  organizer?: string | Address | Address[]
+  attendee?: string | Address | Address[]
+  contact?: string | string[]
+  comment?: string | string[]
+  url?: URL | string
+  freeBusy: FreeBusyPeriod[]
+  xProps?: { [xKey: string]: string }
+}
+
 export interface Event {
   uid: string
   location?: string

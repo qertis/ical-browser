@@ -7,6 +7,7 @@ import {
   VJournal,
   VAlarm,
   VTimezone,
+  VFreeBusy,
   default as ICalendar,
 } from '../lib/index'
 
@@ -257,6 +258,190 @@ test('attendee supports string and address list', () => {
   assert.ok(eventWithAddressListAttendee.ics.includes('ATTENDEE;CN=Ann Brown:mailto:ann.brown@example.com'))
   assert.ok(!eventWithAddressListAttendee.ics.includes('ORGANIZER;CN=John Smith:mailto:john.smith@example.com'))
   assert.ok(!eventWithAddressListAttendee.ics.includes('ORGANIZER;CN=Ann Brown:mailto:ann.brown@example.com'))
+})
+
+test('VFreeBusy serializes RFC 5545 VFREEBUSY components', () => {
+  const freeBusy = new VFreeBusy({
+    uid: '98765@example.com',
+    stamp: new Date('2025-01-29T12:00:00Z'),
+    start: new Date('2025-02-01T00:00:00Z'),
+    end: new Date('2025-02-03T00:00:00Z'),
+    organizer: 'mailto:user@example.com',
+    attendee: [{
+      name: 'Resource One',
+      uri: 'mailto:resource@example.com',
+    }, {
+      name: 'Resource Two',
+      uri: 'mailto:resource-2@example.com',
+    }],
+    contact: ['Ops, Team', 'Helpdesk'],
+    comment: ['Known busy period', 'Bring \\notes'],
+    url: new URL('https://example.com/free-busy'),
+    freeBusy: [
+      {
+        start: new Date('2025-02-01T09:00:00Z'),
+        end: new Date('2025-02-01T11:00:00Z'),
+      },
+      {
+        start: new Date('2025-02-01T13:00:00Z'),
+        end: new Date('2025-02-01T14:00:00Z'),
+        type: 'BUSY-TENTATIVE',
+      },
+      {
+        start: new Date('2025-02-01T15:00:00Z'),
+        duration: 'PT1H',
+        type: 'BUSY',
+      },
+    ],
+    xProps: {
+      'x-source': 'internal, escaped',
+    },
+  })
+
+  const ics = freeBusy.ics
+  assert.ok(ics.startsWith('BEGIN:VFREEBUSY'))
+  assert.ok(ics.endsWith('END:VFREEBUSY'))
+  assert.ok(ics.includes('UID:98765@example.com'))
+  assert.ok(ics.includes('DTSTAMP:20250129T120000Z'))
+  assert.ok(ics.includes('DTSTART:20250201T000000Z'))
+  assert.ok(ics.includes('DTEND:20250203T000000Z'))
+  assert.ok(ics.includes('ORGANIZER:mailto:user@example.com'))
+  assert.ok(ics.includes('ATTENDEE;CN=Resource One:mailto:resource@example.com'))
+  assert.ok(ics.includes('ATTENDEE;CN=Resource Two:mailto:resource-2@example.com'))
+  assert.ok(ics.includes('CONTACT:Ops\\, Team'))
+  assert.ok(ics.includes('CONTACT:Helpdesk'))
+  assert.ok(ics.includes('COMMENT:Known busy period'))
+  assert.ok(ics.includes('COMMENT:Bring \\notes'))
+  assert.ok(ics.includes('URL;VALUE=URI:https://example.com/free-busy'))
+  assert.ok(ics.includes('FREEBUSY:20250201T090000Z/20250201T110000Z'))
+  assert.ok(ics.includes('FREEBUSY;FBTYPE=BUSY-TENTATIVE:20250201T130000Z/20250201T140000Z'))
+  assert.ok(ics.includes('FREEBUSY;FBTYPE=BUSY:20250201T150000Z/PT1H'))
+  assert.ok(ics.includes('X-SOURCE:internal\\, escaped'))
+  assert.equal(ics.match(/^FREEBUSY/gm)?.length, 3)
+  assert.ok(ics.indexOf('DTSTART:20250201T000000Z') < ics.indexOf('FREEBUSY:20250201T090000Z/20250201T110000Z'))
+  assert.ok(ics.indexOf('DTEND:20250203T000000Z') < ics.indexOf('FREEBUSY:20250201T090000Z/20250201T110000Z'))
+})
+
+test('VFreeBusy generates UID and DTSTAMP', () => {
+  const freeBusy = new VFreeBusy({
+    freeBusy: [{
+      start: new Date('2025-02-01T09:00:00Z'),
+      end: new Date('2025-02-01T11:00:00Z'),
+    }],
+  })
+
+  assert.match(freeBusy.ics, /UID:.+/)
+  assert.match(freeBusy.ics, /DTSTAMP:\d{8}T\d{6}Z/)
+})
+
+test('VFreeBusy supports all FBTYPE values', () => {
+  for (const type of ['FREE', 'BUSY', 'BUSY-TENTATIVE', 'BUSY-UNAVAILABLE'] as const) {
+    const freeBusy = new VFreeBusy({
+      freeBusy: [{
+        start: new Date('2025-02-01T09:00:00Z'),
+        duration: 'PT1H',
+        type,
+      }],
+    })
+
+    assert.ok(freeBusy.ics.includes(`FREEBUSY;FBTYPE=${type}:20250201T090000Z/PT1H`))
+  }
+})
+
+test('VFreeBusy validates invalid input', () => {
+  const validPeriod = {
+    start: new Date('2025-02-01T09:00:00Z'),
+    end: new Date('2025-02-01T11:00:00Z'),
+  }
+
+  assert.throws(() => new VFreeBusy({} as never), /freeBusy must contain at least one period/)
+  assert.throws(() => new VFreeBusy({ freeBusy: [] }), /freeBusy must contain at least one period/)
+  assert.throws(() => new VFreeBusy({ start: '2025-02-01' as never, freeBusy: [validPeriod] }), /start must be a Date object/)
+  assert.throws(() => new VFreeBusy({ end: '2025-02-01' as never, freeBusy: [validPeriod] }), /end must be a Date object/)
+  assert.throws(() => new VFreeBusy({
+    start: new Date('2025-02-02T00:00:00Z'),
+    end: new Date('2025-02-01T00:00:00Z'),
+    freeBusy: [validPeriod],
+  }), /end must be after start/)
+  assert.throws(() => new VFreeBusy({ freeBusy: [{ end: new Date() } as never] }), /freeBusy period start must be a Date object/)
+  assert.throws(() => new VFreeBusy({ freeBusy: [{ start: '2025-02-01' as never, end: new Date() }] }), /freeBusy period start must be a Date object/)
+  assert.throws(() => new VFreeBusy({ freeBusy: [{ start: new Date() }] }), /freeBusy period must include either end or duration/)
+  assert.throws(() => new VFreeBusy({ freeBusy: [{ ...validPeriod, duration: 'PT1H' }] }), /freeBusy period must not include both end and duration/)
+  assert.throws(() => new VFreeBusy({ freeBusy: [{ start: new Date(), end: '2025-02-01' as never }] }), /freeBusy period end must be a Date object/)
+  assert.throws(() => new VFreeBusy({
+    freeBusy: [{
+      start: new Date('2025-02-01T11:00:00Z'),
+      end: new Date('2025-02-01T09:00:00Z'),
+    }],
+  }), /freeBusy period end must be after start/)
+  assert.throws(() => new VFreeBusy({
+    freeBusy: [{
+      start: new Date('2025-02-01T09:00:00Z'),
+      duration: 'PT1H',
+      type: 'BUSY-MAYBE' as never,
+    }],
+  }), /freeBusy period type must be FREE, BUSY, BUSY-TENTATIVE or BUSY-UNAVAILABLE/)
+  assert.throws(() => new VFreeBusy({
+    freeBusy: [validPeriod],
+    xProps: { custom: 'value' },
+  }), /xProps keys must start with X-/)
+})
+
+test('ICalendar integrates VFREEBUSY as a top-level component', () => {
+  const timezone = new VTimezone({ tzid: 'UTC' })
+  timezone.addStandard({
+    start: new Date('2025-01-01T00:00:00Z'),
+    tzOffsetFrom: '+0000',
+    tzOffsetTo: '+0000',
+    tzname: 'UTC',
+  })
+  const freeBusyA = new VFreeBusy({
+    uid: 'fb-a',
+    stamp: new Date('2025-01-29T12:00:00Z'),
+    freeBusy: [{
+      start: new Date('2025-02-01T09:00:00Z'),
+      end: new Date('2025-02-01T11:00:00Z'),
+    }],
+  })
+  const freeBusyB = new VFreeBusy({
+    uid: 'fb-b',
+    stamp: new Date('2025-01-29T12:00:00Z'),
+    freeBusy: [{
+      start: new Date('2025-02-02T09:00:00Z'),
+      duration: 'PT1H',
+      type: 'FREE',
+    }],
+  })
+  const event = new VEvent({
+    start: new Date('2025-02-01T09:00:00Z'),
+    end: new Date('2025-02-01T10:00:00Z'),
+  })
+  const todo = new VTodo({ summary: 'Task' })
+  const journal = new VJournal({ summary: 'Journal' })
+  const calendar = new ICalendar({ id: '-//example.com//ical-browser//EN' })
+
+  calendar.addTimezone(timezone)
+  calendar.addFreeBusy(freeBusyA)
+  calendar.addFreeBusy(freeBusyB)
+  calendar.addEvent(event)
+  calendar.addTodo(todo)
+  calendar.addJournal(journal)
+
+  assert.throws(() => calendar.addFreeBusy({} as never), /freeBusy must be an instance of VFreeBusy/)
+
+  const ics = calendar.ics
+  assert.ok(ics.includes('BEGIN:VCALENDAR'))
+  assert.ok(ics.includes('BEGIN:VFREEBUSY'))
+  assert.equal(ics.match(/BEGIN:VFREEBUSY/g)?.length, 2)
+  assert.ok(ics.indexOf('BEGIN:VTIMEZONE') < ics.indexOf('BEGIN:VFREEBUSY'))
+  assert.ok(ics.indexOf('BEGIN:VFREEBUSY') < ics.indexOf('BEGIN:VEVENT'))
+  assert.ok(ics.indexOf('END:VFREEBUSY') < ics.indexOf('BEGIN:VEVENT'))
+  assert.ok(ics.indexOf('END:VEVENT') < ics.indexOf('BEGIN:VTODO'))
+  assert.ok(ics.indexOf('END:VTODO') < ics.indexOf('BEGIN:VJOURNAL'))
+
+  const parsedData = ICAL.parse(ics)
+  const comp = new ICAL.Component(parsedData)
+  assert.equal(comp.getAllSubcomponents('vfreebusy').length, 2)
 })
 
 test('event supports optional end and zero values', () => {
