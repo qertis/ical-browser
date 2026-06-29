@@ -1,6 +1,19 @@
 import { extension } from 'mime-types'
-import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType } from './types'
-import { IBase } from './interfaces'
+import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType, Availability, Available, BusyType, DateListPropertyName } from './types'
+
+interface IBase {
+  readonly ics: string
+}
+
+export enum Day {
+  mo = 'MO',
+  tu = 'TU',
+  we = 'WE',
+  th = 'TH',
+  fr = 'FR',
+  sa = 'SA',
+  su = 'SU',
+}
 
 const BR = '\r\n'
 
@@ -63,6 +76,19 @@ function escapeText(value: string) {
 
 function textListProperty(name: string, values: string[]) {
   return folding(`${name}:${values.map(escapeText).join(',')}`)
+}
+
+function dateListProperty(name: DateListPropertyName, dates: Date[], tz?: string) {
+  const value = dates.map(date => {
+    if (!(date instanceof Date)) {
+      throw new Error(`${name.toLowerCase()} must contain Date objects`)
+    }
+
+    return tz ? dateWithTimeZone(date, tz) : dateWithUTCTime(date) + 'Z'
+  }).join(',')
+  const params = tz ? `;TZID=${tz}` : ''
+
+  return folding(`${name}${params}:${value}`)
 }
 
 // RFC 5545: lines MUST NOT be longer than 75 octets (bytes), excluding the line break.
@@ -272,6 +298,18 @@ function validateFreeBusyType(type?: FreeBusyType) {
   }
 }
 
+function validateBusyType(type?: BusyType) {
+  if (type && type !== 'BUSY' && type !== 'BUSY-UNAVAILABLE' && type !== 'BUSY-TENTATIVE') {
+    throw new Error('busyType must be BUSY, BUSY-UNAVAILABLE or BUSY-TENTATIVE')
+  }
+}
+
+function validatePriority(priority?: number) {
+  if (priority !== undefined && (!Number.isInteger(priority) || priority < 0 || priority > 9)) {
+    throw new Error('priority must be a number from 0 to 9')
+  }
+}
+
 class VBase {
   protected uid: string
   protected stamp: Date
@@ -304,7 +342,7 @@ export class VEvent extends VBase implements IBase {
   #rrule?: Rule
   #lastModified?: Date
   #alarms: VAlarm[]
-  #xProps?: { [xKey: string]: unknown } = {}
+  #xProps?: { [xKey: string]: string } = {}
 
   constructor(data: Event) {
     super(data)
@@ -395,7 +433,7 @@ export class VEvent extends VBase implements IBase {
       this.#lastModified = lastModified
     }
     for (const key of Object.keys(data).filter(key => key.toUpperCase().startsWith('X-'))) {
-      this.#xProps![key] = data[key]
+      this.#xProps![key] = String(data[key])
     }
     this.#alarms = []
   }
@@ -469,12 +507,352 @@ export class VEvent extends VBase implements IBase {
       temp.push('RRULE:' + recurrenceRule(this.#rrule))
     }
     for (const key in this.#xProps) {
-      temp.push(folding(`${key.toUpperCase()}:${escapeText(String(this.#xProps[key]))}`))
+      temp.push(folding(`${key.toUpperCase()}:${escapeText(this.#xProps[key])}`))
     }
     for (const {ics} of this.#alarms) {
       temp.push(ics)
     }
     temp.push('END:VEVENT')
+
+    return temp.join(BR)
+  }
+}
+
+export class VAvailable extends VBase implements IBase {
+  #start: Date
+  #startTz?: string
+  #end?: Date
+  #endTz?: string
+  #duration?: string
+  #created?: Date
+  #description?: string
+  #lastModified?: Date
+  #location?: string
+  #recurrenceId?: Date
+  #recurrenceIdTz?: string
+  #rrule?: Rule
+  #summary?: string
+  #categories?: string[]
+  #rdate?: Date[]
+  #exdate?: Date[]
+  #xProps?: { [xKey: string]: string } = {}
+
+  constructor(data: Available) {
+    super(data)
+    const {
+      start,
+      startTz,
+      end,
+      endTz,
+      duration,
+      created,
+      description,
+      lastModified,
+      location,
+      recurrenceId,
+      recurrenceIdTz,
+      rrule,
+      summary,
+      categories,
+      rdate,
+      exdate,
+      xProps,
+    } = data
+
+    if (!(start instanceof Date)) {
+      throw new Error('start must be a Date object')
+    }
+    if (end !== undefined && duration !== undefined) {
+      throw new Error('end and duration must not be used together')
+    }
+    if (end !== undefined && !(end instanceof Date)) {
+      throw new Error('end must be a Date object')
+    }
+    validateXProps(xProps)
+
+    this.#start = start
+    if (startTz) {
+      this.#startTz = startTz
+    }
+    if (end !== undefined) {
+      this.#end = end
+    }
+    if (endTz) {
+      this.#endTz = endTz
+    }
+    if (duration) {
+      this.#duration = duration
+    }
+    if (created instanceof Date) {
+      this.#created = created
+    }
+    if (description?.length) {
+      this.#description = description
+    }
+    if (lastModified instanceof Date) {
+      this.#lastModified = lastModified
+    }
+    if (location?.length) {
+      this.#location = location
+    }
+    if (recurrenceId instanceof Date) {
+      this.#recurrenceId = recurrenceId
+    }
+    if (recurrenceIdTz) {
+      this.#recurrenceIdTz = recurrenceIdTz
+    }
+    if (rrule) {
+      this.#rrule = rrule
+    }
+    if (summary?.length) {
+      this.#summary = summary
+    }
+    if (categories) {
+      this.#categories = categories
+    }
+    if (rdate) {
+      this.#rdate = rdate
+    }
+    if (exdate) {
+      this.#exdate = exdate
+    }
+    if (xProps) {
+      this.#xProps = xProps
+    }
+  }
+
+  get ics() {
+    const temp: string[] = []
+    temp.push('BEGIN:AVAILABLE')
+    temp.push(`UID:${this.uid}`)
+    temp.push(`DTSTAMP${dateTimeProperty(this.stamp)}`)
+    temp.push(`DTSTART${dateTimeProperty(this.#start, this.#startTz)}`)
+    if (this.#end !== undefined) {
+      temp.push(`DTEND${dateTimeProperty(this.#end, this.#endTz)}`)
+    }
+    if (this.#duration) {
+      temp.push(`DURATION:${this.#duration}`)
+    }
+    if (this.#created) {
+      temp.push(`CREATED${dateTimeProperty(this.#created)}`)
+    }
+    if (this.#description) {
+      temp.push(folding(`DESCRIPTION:${escapeText(this.#description)}`))
+    }
+    if (this.#lastModified) {
+      temp.push(`LAST-MODIFIED${dateTimeProperty(this.#lastModified)}`)
+    }
+    if (this.#location) {
+      temp.push(folding(`LOCATION:${escapeText(this.#location)}`))
+    }
+    if (this.#recurrenceId) {
+      temp.push(`RECURRENCE-ID${dateTimeProperty(this.#recurrenceId, this.#recurrenceIdTz)}`)
+    }
+    if (this.#rrule) {
+      temp.push('RRULE:' + recurrenceRule(this.#rrule))
+    }
+    if (this.#summary) {
+      temp.push(folding(`SUMMARY:${escapeText(this.#summary)}`))
+    }
+    if (this.#categories) {
+      temp.push(textListProperty('CATEGORIES', this.#categories))
+    }
+    if (this.#rdate) {
+      temp.push(dateListProperty('RDATE', this.#rdate))
+    }
+    if (this.#exdate) {
+      temp.push(dateListProperty('EXDATE', this.#exdate))
+    }
+    for (const key in this.#xProps) {
+      temp.push(folding(`${key.toUpperCase()}:${escapeText(this.#xProps[key])}`))
+    }
+    temp.push('END:AVAILABLE')
+
+    return temp.join(BR)
+  }
+}
+
+export class VAvailability extends VBase implements IBase {
+  #start?: Date
+  #startTz?: string
+  #end?: Date
+  #endTz?: string
+  #duration?: string
+  #busyType?: BusyType
+  #klass?: Klass
+  #created?: Date
+  #lastModified?: Date
+  #location?: string
+  #organizer?: string | Address | Address[]
+  #priority?: number
+  #sequence?: number
+  #summary?: string
+  #description?: string
+  #url?: URL
+  #categories?: string[]
+  #xProps?: { [xKey: string]: string } = {}
+  #available: VAvailable[]
+
+  constructor(data: Availability = {}) {
+    super(data)
+    const {
+      start,
+      startTz,
+      end,
+      endTz,
+      duration,
+      busyType,
+      klass,
+      created,
+      lastModified,
+      location,
+      organizer,
+      priority,
+      sequence,
+      summary,
+      description,
+      url,
+      categories,
+      xProps,
+    } = data
+
+    if (start !== undefined && !(start instanceof Date)) {
+      throw new Error('start must be a Date object')
+    }
+    if (end !== undefined && duration !== undefined) {
+      throw new Error('end and duration must not be used together')
+    }
+    if (duration !== undefined && start === undefined) {
+      throw new Error('duration must not be used without start')
+    }
+    if (end !== undefined && !(end instanceof Date)) {
+      throw new Error('end must be a Date object')
+    }
+    validateBusyType(busyType)
+    validatePriority(priority)
+    validateXProps(xProps)
+
+    if (start !== undefined) {
+      this.#start = start
+    }
+    if (startTz) {
+      this.#startTz = startTz
+    }
+    if (end !== undefined) {
+      this.#end = end
+    }
+    if (endTz) {
+      this.#endTz = endTz
+    }
+    if (duration) {
+      this.#duration = duration
+    }
+    if (busyType) {
+      this.#busyType = busyType
+    }
+    if (klass) {
+      this.#klass = klass
+    }
+    if (created instanceof Date) {
+      this.#created = created
+    }
+    if (lastModified instanceof Date) {
+      this.#lastModified = lastModified
+    }
+    if (location?.length) {
+      this.#location = location
+    }
+    if (organizer) {
+      this.#organizer = organizer
+    }
+    if (typeof priority === 'number') {
+      this.#priority = priority
+    }
+    if (typeof sequence === 'number') {
+      this.#sequence = sequence
+    }
+    if (summary?.length) {
+      this.#summary = summary
+    }
+    if (description?.length) {
+      this.#description = description
+    }
+    if (url && url instanceof URL) {
+      this.#url = url
+    }
+    if (categories) {
+      this.#categories = categories
+    }
+    if (xProps) {
+      this.#xProps = xProps
+    }
+    this.#available = []
+  }
+
+  addAvailable(available: VAvailable) {
+    if (!(available instanceof VAvailable)) {
+      throw new Error('available must be an instance of VAvailable')
+    }
+    this.#available.push(available)
+  }
+
+  get ics() {
+    const temp: string[] = []
+    temp.push('BEGIN:VAVAILABILITY')
+    temp.push(`UID:${this.uid}`)
+    temp.push(`DTSTAMP${dateTimeProperty(this.stamp)}`)
+    if (this.#busyType) {
+      temp.push(`BUSYTYPE:${this.#busyType}`)
+    }
+    if (this.#klass) {
+      temp.push(createClass(this.#klass))
+    }
+    if (this.#created) {
+      temp.push(`CREATED${dateTimeProperty(this.#created)}`)
+    }
+    if (this.#description) {
+      temp.push(folding(`DESCRIPTION:${escapeText(this.#description)}`))
+    }
+    if (this.#start) {
+      temp.push(`DTSTART${dateTimeProperty(this.#start, this.#startTz)}`)
+    }
+    if (this.#end) {
+      temp.push(`DTEND${dateTimeProperty(this.#end, this.#endTz)}`)
+    }
+    if (this.#duration) {
+      temp.push(`DURATION:${this.#duration}`)
+    }
+    if (this.#lastModified) {
+      temp.push(`LAST-MODIFIED${dateTimeProperty(this.#lastModified)}`)
+    }
+    if (this.#location) {
+      temp.push(folding(`LOCATION:${escapeText(this.#location)}`))
+    }
+    if (this.#organizer) {
+      temp.push(createOrganizer(this.#organizer))
+    }
+    if (typeof this.#priority === 'number') {
+      temp.push(`PRIORITY:${this.#priority}`)
+    }
+    if (typeof this.#sequence === 'number') {
+      temp.push(`SEQUENCE:${this.#sequence}`)
+    }
+    if (this.#summary) {
+      temp.push(folding(`SUMMARY:${escapeText(this.#summary)}`))
+    }
+    if (this.#url) {
+      temp.push(createUri(this.#url))
+    }
+    if (this.#categories) {
+      temp.push(textListProperty('CATEGORIES', this.#categories))
+    }
+    for (const key in this.#xProps) {
+      temp.push(folding(`${key.toUpperCase()}:${escapeText(this.#xProps[key])}`))
+    }
+    for (const {ics} of this.#available) {
+      temp.push(ics)
+    }
+    temp.push('END:VAVAILABILITY')
 
     return temp.join(BR)
   }
@@ -980,6 +1358,7 @@ export default class ICalendar {
   #todos: VTodo[]
   #journals: VJournal[]
   #timezones: VTimezone[]
+  #availabilities: VAvailability[]
   #freeBusy: VFreeBusy[]
 
   #prodId: string
@@ -1009,6 +1388,7 @@ export default class ICalendar {
     this.#todos = []
     this.#journals = []
     this.#timezones = []
+    this.#availabilities = []
     this.#freeBusy = []
   }
 
@@ -1028,6 +1408,13 @@ export default class ICalendar {
     this.#timezones.push(timezone)
   }
 
+  addAvailability(availability: VAvailability) {
+    if (!(availability instanceof VAvailability)) {
+      throw new Error('availability must be an instance of VAvailability')
+    }
+    this.#availabilities.push(availability)
+  }
+
   addFreeBusy(freeBusy: VFreeBusy) {
     if (!(freeBusy instanceof VFreeBusy)) {
       throw new Error('freeBusy must be an instance of VFreeBusy')
@@ -1043,6 +1430,9 @@ export default class ICalendar {
     temp.push(`CALSCALE:${this.#calscale}`)
     temp.push(`METHOD:${this.#method}`)
     for (const {ics} of this.#timezones) {
+      temp.push(ics)
+    }
+    for (const {ics} of this.#availabilities) {
       temp.push(ics)
     }
     for (const {ics} of this.#freeBusy) {

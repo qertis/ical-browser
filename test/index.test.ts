@@ -8,6 +8,9 @@ import {
   VAlarm,
   VTimezone,
   VFreeBusy,
+  VAvailability,
+  VAvailable,
+  Day,
   default as ICalendar,
 } from '../lib/index'
 
@@ -260,7 +263,7 @@ test('attendee supports string and address list', () => {
   assert.ok(!eventWithAddressListAttendee.ics.includes('ORGANIZER;CN=Ann Brown:mailto:ann.brown@example.com'))
 })
 
-test('VFreeBusy serializes RFC 5545 VFREEBUSY components', () => {
+test('VFreeBusy', () => {
   const freeBusy = new VFreeBusy({
     uid: '98765@example.com',
     stamp: new Date('2025-01-29T12:00:00Z'),
@@ -320,6 +323,172 @@ test('VFreeBusy serializes RFC 5545 VFREEBUSY components', () => {
   assert.equal(ics.match(/^FREEBUSY/gm)?.length, 3)
   assert.ok(ics.indexOf('DTSTART:20250201T000000Z') < ics.indexOf('FREEBUSY:20250201T090000Z/20250201T110000Z'))
   assert.ok(ics.indexOf('DTEND:20250203T000000Z') < ics.indexOf('FREEBUSY:20250201T090000Z/20250201T110000Z'))
+})
+
+test('VAvailable', () => {
+  const available = new VAvailable({
+    uid: 'work-hours@example.com',
+    stamp: new Date('2026-06-29T12:00:00Z'),
+    start: new Date('2026-07-06T09:00:00Z'),
+    startTz: 'Europe/Berlin',
+    end: new Date('2026-07-06T17:00:00Z'),
+    endTz: 'Europe/Berlin',
+    summary: 'Monday to Friday, 09:00-17:00',
+    rrule: {
+      freq: 'WEEKLY',
+      byday: [Day.mo, Day.tu, Day.we, Day.th, Day.fr],
+    },
+    rdate: [new Date('2026-07-12T09:00:00Z')],
+    exdate: [
+      new Date('2026-07-10T09:00:00Z'),
+      new Date('2026-07-11T09:00:00Z'),
+    ],
+  })
+
+  const ics = available.ics
+  assert.ok(ics.startsWith('BEGIN:AVAILABLE'))
+  assert.ok(ics.endsWith('END:AVAILABLE'))
+  assert.ok(ics.includes('UID:work-hours@example.com'))
+  assert.ok(ics.includes('DTSTAMP:20260629T120000Z'))
+  assert.ok(ics.includes('DTSTART;TZID=Europe/Berlin:20260706T110000'))
+  assert.ok(ics.includes('DTEND;TZID=Europe/Berlin:20260706T190000'))
+  assert.ok(ics.includes('SUMMARY:Monday to Friday\\, 09:00-17:00'))
+  assert.ok(ics.includes('RRULE:FREQ=WEEKLY;WKST=MO;BYDAY=MO,TU,WE,TH,FR'))
+  assert.ok(ics.includes('RDATE:20260712T090000Z'))
+  assert.ok(ics.includes('EXDATE:20260710T090000Z,20260711T090000Z'))
+})
+
+test('VAvailability', () => {
+  const available = new VAvailable({
+    uid: 'doctor-mon-thu@example.com',
+    stamp: new Date('2026-06-29T12:00:00Z'),
+    start: new Date('2026-07-06T10:00:00Z'),
+    end: new Date('2026-07-06T18:00:00Z'),
+    summary: 'Monday to Thursday',
+  })
+  const availability = new VAvailability({
+    uid: 'doctor-availability@example.com',
+    stamp: new Date('2026-06-29T12:00:00Z'),
+    busyType: 'BUSY-UNAVAILABLE',
+    priority: 0,
+    summary: 'Doctor working hours',
+    categories: ['doctor,calendar', 'booking;hours'],
+    xProps: {
+      'x-source': 'booking-service',
+    },
+  })
+
+  availability.addAvailable(available)
+
+  const ics = availability.ics
+  assert.ok(ics.startsWith('BEGIN:VAVAILABILITY'))
+  assert.ok(ics.endsWith('END:VAVAILABILITY'))
+  assert.ok(ics.includes('UID:doctor-availability@example.com'))
+  assert.ok(ics.includes('DTSTAMP:20260629T120000Z'))
+  assert.ok(ics.includes('BUSYTYPE:BUSY-UNAVAILABLE'))
+  assert.ok(ics.includes('PRIORITY:0'))
+  assert.ok(ics.includes('SUMMARY:Doctor working hours'))
+  assert.ok(ics.includes('CATEGORIES:doctor\\,calendar,booking\\;hours'))
+  assert.ok(ics.includes('X-SOURCE:booking-service'))
+  assert.ok(ics.indexOf('SUMMARY:Doctor working hours') < ics.indexOf('BEGIN:AVAILABLE'))
+  assert.ok(ics.indexOf('BEGIN:AVAILABLE') < ics.indexOf('END:VAVAILABILITY'))
+})
+
+test('ICalendar integrates VAVAILABILITY', () => {
+  const timezone = new VTimezone({ tzid: 'UTC' })
+  timezone.addStandard({
+    start: new Date('2026-01-01T00:00:00Z'),
+    tzOffsetFrom: '+0000',
+    tzOffsetTo: '+0000',
+    tzname: 'UTC',
+  })
+  const availability = new VAvailability({
+    uid: 'availability@example.com',
+    stamp: new Date('2026-06-29T12:00:00Z'),
+  })
+  availability.addAvailable(new VAvailable({
+    uid: 'available@example.com',
+    stamp: new Date('2026-06-29T12:00:00Z'),
+    start: new Date('2026-07-06T09:00:00Z'),
+    end: new Date('2026-07-06T17:00:00Z'),
+  }))
+  const event = new VEvent({
+    start: new Date('2026-07-06T18:00:00Z'),
+    end: new Date('2026-07-06T19:00:00Z'),
+  })
+  const calendar = new ICalendar({ id: '-//example.com//availability//EN' })
+
+  calendar.addTimezone(timezone)
+  calendar.addAvailability(availability)
+  calendar.addEvent(event)
+
+  assert.throws(() => calendar.addAvailability({} as never), /availability must be an instance of VAvailability/)
+
+  const ics = calendar.ics
+  assert.ok(ics.includes('BEGIN:VCALENDAR'))
+  assert.ok(ics.includes('BEGIN:VAVAILABILITY'))
+  assert.ok(ics.indexOf('BEGIN:VTIMEZONE') < ics.indexOf('BEGIN:VAVAILABILITY'))
+  assert.ok(ics.indexOf('BEGIN:VAVAILABILITY') < ics.indexOf('BEGIN:VEVENT'))
+  assert.ok(ics.indexOf('END:VAVAILABILITY') < ics.indexOf('BEGIN:VEVENT'))
+
+  const parsedData = ICAL.parse(ics)
+  const comp = new ICAL.Component(parsedData)
+  assert.equal(comp.getAllSubcomponents('vavailability').length, 1)
+})
+
+test('VAvailability and VAvailable validate invalid input', () => {
+  assert.throws(() => new VAvailable({} as never), /start must be a Date object/)
+  assert.throws(() => new VAvailable({ start: '2026-07-06' as never }), /start must be a Date object/)
+  assert.throws(() => new VAvailable({
+    start: new Date('2026-07-06T09:00:00Z'),
+    end: '2026-07-06' as never,
+  }), /end must be a Date object/)
+  assert.throws(() => new VAvailable({
+    start: new Date('2026-07-06T09:00:00Z'),
+    end: new Date('2026-07-06T17:00:00Z'),
+    duration: 'PT8H',
+  }), /end and duration must not be used together/)
+  assert.throws(() => new VAvailability({
+    duration: 'P1D',
+  }), /duration must not be used without start/)
+  assert.throws(() => new VAvailability({
+    busyType: 'BUSY-MAYBE' as never,
+  }), /busyType must be BUSY, BUSY-UNAVAILABLE or BUSY-TENTATIVE/)
+  assert.throws(() => new VAvailability({
+    priority: 10,
+  }), /priority must be a number from 0 to 9/)
+  assert.throws(() => new VAvailability().addAvailable({} as never), /available must be an instance of VAvailable/)
+})
+
+test('VAvailability and VAvailable escape and fold text values', () => {
+  const longText = 'Doctor availability, with semicolon; '.repeat(8)
+  const available = new VAvailable({
+    uid: 'available-text@example.com',
+    stamp: new Date('2026-06-29T12:00:00Z'),
+    start: new Date('2026-07-06T09:00:00Z'),
+    duration: 'PT8H',
+    summary: longText,
+    description: 'Line 1\nLine 2, with semicolon; and slash \\',
+    location: 'Room 1, Floor 2',
+    categories: ['work,weekdays', 'booking;public'],
+    xProps: {
+      'x-note': 'alpha,beta;gamma',
+    },
+  })
+  const availability = new VAvailability({
+    uid: 'availability-text@example.com',
+    stamp: new Date('2026-06-29T12:00:00Z'),
+    summary: longText,
+  })
+  availability.addAvailable(available)
+
+  assert.ok(available.ics.includes('DESCRIPTION:Line 1\\nLine 2\\, with semicolon\\; and slash \\\\'))
+  assert.ok(available.ics.includes('LOCATION:Room 1\\, Floor 2'))
+  assert.ok(available.ics.includes('CATEGORIES:work\\,weekdays,booking\\;public'))
+  assert.ok(available.ics.includes('X-NOTE:alpha\\,beta\\;gamma'))
+  for (const line of availability.ics.split('\r\n')) {
+    assert.ok(new TextEncoder().encode(line).length <= 75)
+  }
 })
 
 test('VFreeBusy generates UID and DTSTAMP', () => {

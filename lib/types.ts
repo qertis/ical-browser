@@ -3,17 +3,9 @@ export type Address = {
   uri: string
 }
 
-export enum Day {
-  mo = 'MO',
-  tu = 'TU',
-  we = 'WE',
-  th = 'TH',
-  fr = 'FR',
-  sa = 'SA',
-  su = 'SU',
-}
-
 export type RuleFreq = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
+
+export type RuleDay = 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU'
 
 export type Rule = {
   freq: RuleFreq
@@ -21,7 +13,7 @@ export type Rule = {
   interval?: number
   until?: Date
   wkst?: 'MO' | 'SU'
-  byday?: Day | Day[]
+  byday?: RuleDay | RuleDay[]
   byweekno?: number | number[]
   bymonthday?: number | number[]
   byyearday?: number | number[]
@@ -34,6 +26,55 @@ export type Klass = 'PUBLIC' | 'PRIVATE' | 'CONFIDENTIAL'
 export type Transp = 'TRANSPARENT' | 'OPAQUE'
 
 export type FreeBusyType = 'FREE' | 'BUSY' | 'BUSY-TENTATIVE' | 'BUSY-UNAVAILABLE'
+
+export type BusyType = 'BUSY' | 'BUSY-UNAVAILABLE' | 'BUSY-TENTATIVE'
+
+export type DateListPropertyName = 'RDATE' | 'EXDATE'
+
+export interface Availability {
+  uid?: string
+  stamp?: Date
+  start?: Date
+  startTz?: string
+  end?: Date
+  endTz?: string
+  duration?: string
+  busyType?: BusyType
+  klass?: Klass
+  created?: Date
+  lastModified?: Date
+  location?: string
+  organizer?: string | Address | Address[]
+  priority?: number
+  sequence?: number
+  summary?: string
+  description?: string
+  url?: URL
+  categories?: string[]
+  xProps?: { [xKey: string]: string }
+}
+
+export interface Available {
+  uid?: string
+  stamp?: Date
+  start: Date
+  startTz?: string
+  end?: Date
+  endTz?: string
+  duration?: string
+  created?: Date
+  description?: string
+  lastModified?: Date
+  location?: string
+  recurrenceId?: Date
+  recurrenceIdTz?: string
+  rrule?: Rule
+  summary?: string
+  categories?: string[]
+  rdate?: Date[]
+  exdate?: Date[]
+  xProps?: { [xKey: string]: string }
+}
 
 export interface FreeBusyPeriod {
   start: Date
