@@ -342,3 +342,192 @@ test('RFC 5545: text newlines are escaped', () => {
   const parsedEvent = parsed.getFirstSubcomponent('vevent')
   assert.equal(parsedEvent.getFirstPropertyValue('description'), 'Qweqweqwe\nqwe\nqwe\nqwe')
 })
+
+test('VALARM validates', () => {
+  const createAlarm = (data: Record<string, unknown>) => new VAlarm(data as never)
+
+  assert.doesNotThrow(() => createAlarm({
+    action: 'DISPLAY',
+    trigger: '-PT15M',
+    description: 'Reminder text',
+  }))
+  assert.throws(() => createAlarm({ action: 'DISPLAY', trigger: '-PT15M' }), /description is required for DISPLAY alarm/)
+  assert.throws(() => createAlarm({
+    action: 'DISPLAY',
+    trigger: '-PT15M',
+    description: 'Reminder text',
+    attach: 'https://example.com/alarm.mp3',
+  }), /attach is not allowed for DISPLAY alarm/)
+  assert.throws(() => createAlarm({
+    action: 'DISPLAY',
+    trigger: '-PT15M',
+    description: 'Reminder text',
+    attendee: 'mailto:user@example.com',
+  }), /attendee is not allowed for DISPLAY alarm/)
+  assert.throws(() => createAlarm({
+    action: 'DISPLAY',
+    trigger: '-PT15M',
+    description: 'Reminder text',
+    summary: 'Subject',
+  }), /summary is not allowed for DISPLAY alarm/)
+
+  assert.doesNotThrow(() => createAlarm({ action: 'AUDIO', trigger: '-PT10M' }))
+  assert.doesNotThrow(() => createAlarm({
+    action: 'AUDIO',
+    trigger: '-PT10M',
+    attach: 'https://example.com/alarm.mp3',
+  }))
+  assert.throws(() => createAlarm({
+    action: 'AUDIO',
+    trigger: '-PT10M',
+    description: 'Reminder text',
+  }), /description is not allowed for AUDIO alarm/)
+  assert.throws(() => createAlarm({
+    action: 'AUDIO',
+    trigger: '-PT10M',
+    summary: 'Subject',
+  }), /summary is not allowed for AUDIO alarm/)
+  assert.throws(() => createAlarm({
+    action: 'AUDIO',
+    trigger: '-PT10M',
+    attendee: 'mailto:user@example.com',
+  }), /attendee is not allowed for AUDIO alarm/)
+  assert.throws(() => createAlarm({
+    action: 'AUDIO',
+    trigger: '-PT10M',
+    attach: ['https://example.com/one.mp3', 'https://example.com/two.mp3'],
+  }), /AUDIO alarm supports at most one attach/)
+
+  assert.doesNotThrow(() => createAlarm({
+    action: 'EMAIL',
+    trigger: '-PT30M',
+    description: 'Reminder body',
+    summary: 'Reminder subject',
+    attendee: 'mailto:user@example.com',
+  }))
+  assert.doesNotThrow(() => createAlarm({
+    action: 'EMAIL',
+    trigger: '-PT30M',
+    description: 'Reminder body',
+    summary: 'Reminder subject',
+    attendee: [{
+      name: 'First',
+      uri: 'mailto:first@example.com',
+    }, {
+      name: 'Second',
+      uri: 'mailto:second@example.com',
+    }],
+  }))
+  assert.doesNotThrow(() => createAlarm({
+    action: 'EMAIL',
+    trigger: '-PT30M',
+    description: 'Reminder body',
+    summary: 'Reminder subject',
+    attendee: 'mailto:user@example.com',
+    attach: ['https://example.com/one.txt', 'https://example.com/two.txt'],
+  }))
+  assert.throws(() => createAlarm({
+    action: 'EMAIL',
+    trigger: '-PT30M',
+    summary: 'Reminder subject',
+    attendee: 'mailto:user@example.com',
+  }), /description is required for EMAIL alarm/)
+  assert.throws(() => createAlarm({
+    action: 'EMAIL',
+    trigger: '-PT30M',
+    description: 'Reminder body',
+    attendee: 'mailto:user@example.com',
+  }), /summary is required for EMAIL alarm/)
+  assert.throws(() => createAlarm({
+    action: 'EMAIL',
+    trigger: '-PT30M',
+    description: 'Reminder body',
+    summary: 'Reminder subject',
+  }), /at least one attendee is required for EMAIL alarm/)
+  assert.throws(() => createAlarm({
+    action: 'EMAIL',
+    trigger: '-PT30M',
+    description: 'Reminder body',
+    summary: 'Reminder subject',
+    attendee: [],
+  }), /at least one attendee is required for EMAIL alarm/)
+
+  assert.throws(() => createAlarm({ trigger: '-PT15M', description: 'Reminder text' }), /action is required/)
+  assert.throws(() => createAlarm({ action: 'DISPLAY', description: 'Reminder text' }), /trigger is required/)
+  assert.throws(() => createAlarm({
+    action: 'DISPLAY',
+    trigger: '-PT15M',
+    description: 'Reminder text',
+    duration: 'PT5M',
+  }), /duration and repeat must be used together/)
+  assert.throws(() => createAlarm({
+    action: 'DISPLAY',
+    trigger: '-PT15M',
+    description: 'Reminder text',
+    repeat: 3,
+  }), /duration and repeat must be used together/)
+  assert.throws(() => createAlarm({
+    action: 'PROCEDURE',
+    trigger: '-PT15M',
+    attach: 'https://example.com/script.sh',
+  }), /unsupported alarm action: PROCEDURE/)
+  assert.throws(() => createAlarm({
+    action: 'DISPLAY',
+    trigger: '-PT15M',
+    description: 'Reminder text',
+    xProps: { custom: 'value' },
+  }), /xProps keys must start with X-/)
+})
+
+test('VALARM serializes RFC 5545 alarm properties', () => {
+  const emailAlarm = new VAlarm({
+    action: 'EMAIL',
+    trigger: '-PT30M',
+    description: 'Reminder body, with text',
+    summary: 'Reminder subject',
+    attendee: [{
+      name: 'First',
+      uri: 'mailto:first@example.com',
+    }, {
+      name: 'Second',
+      uri: 'mailto:second@example.com',
+    }],
+    attach: ['https://example.com/one.txt', 'https://example.com/two.txt'],
+    duration: 'PT5M',
+    repeat: 3,
+    xProps: {
+      'x-custom': 'a,b;c',
+    },
+  })
+
+  assert.ok(emailAlarm.ics.includes('SUMMARY:Reminder subject'))
+  assert.ok(emailAlarm.ics.includes('DESCRIPTION:Reminder body\\, with text'))
+  assert.ok(emailAlarm.ics.includes('ATTENDEE;CN=First:mailto:first@example.com'))
+  assert.ok(emailAlarm.ics.includes('ATTENDEE;CN=Second:mailto:second@example.com'))
+  assert.ok(emailAlarm.ics.includes('ATTACH;VALUE=URI:https://example.com/one.txt'))
+  assert.ok(emailAlarm.ics.includes('ATTACH;VALUE=URI:https://example.com/two.txt'))
+  assert.ok(emailAlarm.ics.includes('DURATION:PT5M'))
+  assert.ok(emailAlarm.ics.includes('REPEAT:3'))
+  assert.ok(emailAlarm.ics.includes('X-CUSTOM:a\\,b\\;c'))
+
+  const audioAlarm = new VAlarm({
+    action: 'AUDIO',
+    trigger: '-PT10M',
+    attach: 'https://example.com/alarm.mp3',
+  })
+  assert.ok(audioAlarm.ics.includes('ACTION:AUDIO'))
+  assert.ok(audioAlarm.ics.includes('ATTACH;VALUE=URI:https://example.com/alarm.mp3'))
+
+  const todo = new VTodo({
+    uid: 'todo-with-alarm',
+    due: new Date('2024-06-01T09:00:00Z'),
+    summary: 'Task with reminder',
+  })
+  todo.addAlarm(new VAlarm({
+    action: 'DISPLAY',
+    trigger: '-PT15M',
+    description: 'Reminder text',
+  }))
+  assert.ok(todo.ics.includes('BEGIN:VALARM'))
+  assert.ok(todo.ics.includes('END:VALARM'))
+})

@@ -477,6 +477,7 @@ export class VTodo extends VBase implements IBase {
   #rrule?: Rule
   #klass?: Klass
   #categories?: string[]
+  #alarms: VAlarm[]
 
   constructor(data: Todo) {
     super(data)
@@ -514,6 +515,11 @@ export class VTodo extends VBase implements IBase {
     if (rrule) {
       this.#rrule = rrule
     }
+    this.#alarms = []
+  }
+
+  addAlarm(alarm: VAlarm) {
+    this.#alarms.push(alarm)
   }
 
   get ics() {
@@ -545,6 +551,9 @@ export class VTodo extends VBase implements IBase {
     }
     if (this.#rrule) {
       temp.push('RRULE:' + recurrenceRule(this.#rrule))
+    }
+    for (const {ics} of this.#alarms) {
+      temp.push(ics)
     }
     temp.push('END:VTODO')
 
@@ -609,50 +618,98 @@ export class VAlarm implements IBase {
   #action: string
   #trigger: string
   #description?: string
-  #attach?: string
+  #summary?: string
+  #attach?: string | string[]
   #attendee?: string | Address | Address[]
+  #duration?: string
+  #repeat?: number
+  #xProps?: { [xKey: string]: string } = {}
 
   constructor(data: Alarm) {
-    const { action, description, trigger, attach, attendee} = data
-    if (!trigger) {
-      throw new Error('trigger is required')
-    }
-    this.#trigger = trigger
+    const { action, description, trigger, attach, attendee, summary, duration, repeat, xProps } = data
+    const normalizedAction = action?.toUpperCase()
     if (!action) {
       throw new Error('action is required')
     }
-    this.#action = action.toUpperCase()
+    if (!trigger) {
+      throw new Error('trigger is required')
+    }
+    if ((duration && repeat === undefined) || (!duration && repeat !== undefined)) {
+      throw new Error('duration and repeat must be used together')
+    }
+    if (xProps && Object.keys(xProps).some(key => !key.toUpperCase().startsWith('X-'))) {
+      throw new Error('xProps keys must start with X-')
+    }
 
-    switch (this.#action) {
+    switch (normalizedAction) {
       case 'DISPLAY': {
-        if (description?.length) {
-          this.#description = description
+        if (!description) {
+          throw new Error('description is required for DISPLAY alarm')
+        }
+        if (attach) {
+          throw new Error('attach is not allowed for DISPLAY alarm')
+        }
+        if (attendee) {
+          throw new Error('attendee is not allowed for DISPLAY alarm')
+        }
+        if (summary) {
+          throw new Error('summary is not allowed for DISPLAY alarm')
         }
         break
       }
       case 'AUDIO': {
-        if (attach) {
-          this.#attach = attach
+        if (description) {
+          throw new Error('description is not allowed for AUDIO alarm')
+        }
+        if (summary) {
+          throw new Error('summary is not allowed for AUDIO alarm')
+        }
+        if (attendee) {
+          throw new Error('attendee is not allowed for AUDIO alarm')
+        }
+        if (Array.isArray(attach)) {
+          throw new Error('AUDIO alarm supports at most one attach')
         }
         break
       }
       case 'EMAIL': {
-        if (description?.length) {
-          this.#description = description
+        if (!description) {
+          throw new Error('description is required for EMAIL alarm')
         }
-        if (attendee) {
-          this.#attendee = attendee
+        if (!summary) {
+          throw new Error('summary is required for EMAIL alarm')
         }
-        break
-      }
-      case 'PROCEDURE': {
-        if (attach) {
-          this.#attach = attach
+        if (!attendee || (Array.isArray(attendee) && attendee.length === 0)) {
+          throw new Error('at least one attendee is required for EMAIL alarm')
         }
         break
       }
       default:
-        break
+        throw new Error(`unsupported alarm action: ${action}`)
+    }
+
+    this.#action = normalizedAction
+    this.#trigger = trigger
+    if (description) {
+      this.#description = description
+    }
+    if (summary) {
+      this.#summary = summary
+    }
+    if (attach) {
+      this.#attach = attach
+    }
+    if (attendee) {
+      this.#attendee = attendee
+    }
+    if (duration) {
+      this.#duration = duration
+    }
+    if (repeat !== undefined) {
+      this.#repeat = repeat
+    }
+    if (xProps) {
+      this.#xProps = xProps
     }
   }
 
@@ -669,11 +726,35 @@ export class VAlarm implements IBase {
     if (this.#description) {
       temp.push(folding(`DESCRIPTION:${escapeText(this.#description)}`))
     }
+    if (this.#summary) {
+      temp.push(folding(`SUMMARY:${escapeText(this.#summary)}`))
+    }
     if (this.#attendee) {
-      temp.push(createAttendee(this.#attendee))
+      if (Array.isArray(this.#attendee)) {
+        for (const attendee of this.#attendee) {
+          temp.push(createAttendee(attendee))
+        }
+      } else {
+        temp.push(createAttendee(this.#attendee))
+      }
     }
     if (this.#attach) {
-      temp.push(folding(createAttach(this.#attach)))
+      if (Array.isArray(this.#attach)) {
+        for (const attach of this.#attach) {
+          temp.push(folding(createAttach(attach)))
+        }
+      } else {
+        temp.push(folding(createAttach(this.#attach)))
+      }
+    }
+    if (this.#duration) {
+      temp.push(`DURATION:${this.#duration}`)
+    }
+    if (this.#repeat !== undefined) {
+      temp.push(`REPEAT:${this.#repeat}`)
+    }
+    for (const key in this.#xProps) {
+      temp.push(folding(`${key.toUpperCase()}:${escapeText(this.#xProps[key])}`))
     }
     temp.push('END:VALARM')
 

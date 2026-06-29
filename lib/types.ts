@@ -87,10 +87,14 @@ export interface Journal {
 
 export interface Alarm {
   action: Action
+  trigger: string
   description?: string
-  trigger?: string
-  attach?: string
+  summary?: string
   attendee?: string | Address | Address[]
+  attach?: string | string[]
+  duration?: string
+  repeat?: number
+  xProps?: { [xKey: string]: string }
 }
 
 export interface Timezone {
