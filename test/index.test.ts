@@ -151,6 +151,65 @@ test('icalendar', () => {
   assert.equal(eventData.getFirstPropertyValue('categories'), 'test')
 })
 
+test('RRULE omits empty BY parts and remains parseable', () => {
+  const event = new VEvent({
+    uid: 'monthly@example.com',
+    start: new Date('2026-07-10T10:00:00Z'),
+    rrule: {
+      freq: 'MONTHLY',
+      interval: 1,
+      byday: [],
+      bymonthday: 10,
+      bymonth: [],
+      byhour: [],
+      byminute: [],
+    },
+  })
+
+  assert.ok(event.ics.includes('RRULE:FREQ=MONTHLY;INTERVAL=1;WKST=MO;BYMONTHDAY=10'))
+  assert.ok(!event.ics.includes('BYDAY='))
+  assert.ok(!event.ics.includes('BYMONTH='))
+  assert.ok(!event.ics.includes('BYHOUR='))
+  assert.ok(!event.ics.includes('BYMINUTE='))
+  assert.doesNotThrow(() => ICAL.parse(event.ics))
+})
+
+test('RRULE serializes scalar and array BY values, including zero', () => {
+  const yearly = new VEvent({
+    uid: 'yearly@example.com',
+    start: new Date('2026-07-10T10:00:00Z'),
+    rrule: {
+      freq: 'YEARLY',
+      bymonth: [1, 7],
+      bymonthday: 10,
+    },
+  })
+  const daily = new VEvent({
+    uid: 'daily@example.com',
+    start: new Date('2026-07-10T10:00:00Z'),
+    rrule: {
+      freq: 'DAILY',
+      bymonth: 7,
+      byhour: 0,
+      byminute: 0,
+    },
+  })
+  const dailyLists = new VEvent({
+    uid: 'daily-lists@example.com',
+    start: new Date('2026-07-10T10:00:00Z'),
+    rrule: {
+      freq: 'DAILY',
+      bymonth: [1, 7],
+      byhour: [0, 12],
+      byminute: [0, 30],
+    },
+  })
+
+  assert.ok(yearly.ics.includes('RRULE:FREQ=YEARLY;WKST=MO;BYMONTH=1,7;BYMONTHDAY=10'))
+  assert.ok(daily.ics.includes('RRULE:FREQ=DAILY;WKST=MO;BYMONTH=7;BYHOUR=0;BYMINUTE=0'))
+  assert.ok(dailyLists.ics.includes('RRULE:FREQ=DAILY;WKST=MO;BYMONTH=1,7;BYHOUR=0,12;BYMINUTE=0,30'))
+})
+
 test('RFC 5545: 75 octets', () => {
   const encoder = new TextEncoder()
 

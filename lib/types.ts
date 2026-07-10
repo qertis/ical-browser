@@ -15,8 +15,11 @@ export type Rule = {
   wkst?: 'MO' | 'SU'
   byday?: RuleDay | RuleDay[]
   byweekno?: number | number[]
+  bymonth?: number | number[]
   bymonthday?: number | number[]
   byyearday?: number | number[]
+  byhour?: number | number[]
+  byminute?: number | number[]
 }
 
 export type EventStatus = 'TENTATIVE' | 'CONFIRMED' | 'CANCELLED'

@@ -143,10 +143,21 @@ function recurrenceRule({
   wkst = 'MO',
   byday,
   byweekno,
+  bymonth,
   bymonthday,
   byyearday,
+  byhour,
+  byminute,
 }: Rule) {
   const parts: string[] = []
+  const addListPart = (name: string, value: string | number | (string | number)[] | undefined) => {
+    if (value === undefined || (Array.isArray(value) && value.length === 0)) {
+      return
+    }
+
+    parts.push(`${name}=${Array.isArray(value) ? value.join(',') : value}`)
+  }
+
   if (freq) {
     parts.push(`FREQ=${freq}`)
   }
@@ -162,34 +173,13 @@ function recurrenceRule({
   if (wkst) {
     parts.push(`WKST=${wkst}`)
   }
-  if (byday) {
-    if (Array.isArray(byday)) {
-      parts.push(`BYDAY=${byday.join(',')}`)
-    } else {
-      parts.push(`BYDAY=${byday}`)
-    }
-  }
-  if (byweekno) {
-    if (Array.isArray(byweekno)) {
-      parts.push(`BYWEEKNO=${byweekno.join(',')}`)
-    } else {
-      parts.push(`BYWEEKNO=${byweekno}`)
-    }
-  }
-  if (bymonthday) {
-    if (Array.isArray(bymonthday)) {
-      parts.push(`BYMONTHDAY=${bymonthday.join(',')}`)
-    } else {
-      parts.push(`BYMONTHDAY=${bymonthday}`)
-    }
-  }
-  if (byyearday) {
-    if (Array.isArray(byyearday)) {
-      parts.push(`BYYEARDAY=${byyearday.join(',')}`)
-    } else {
-      parts.push(`BYYEARDAY=${byyearday}`)
-    }
-  }
+  addListPart('BYDAY', byday)
+  addListPart('BYWEEKNO', byweekno)
+  addListPart('BYMONTH', bymonth)
+  addListPart('BYMONTHDAY', bymonthday)
+  addListPart('BYYEARDAY', byyearday)
+  addListPart('BYHOUR', byhour)
+  addListPart('BYMINUTE', byminute)
 
   return parts.join(';')
 }
