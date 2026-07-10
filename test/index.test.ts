@@ -693,6 +693,82 @@ test('event supports optional end and zero values', () => {
   assert.ok(!zeroDurationEvent.ics.includes('DURATION:PT1H00M'))
 })
 
+test('ICalendar automatically adds unique VTIMEZONE blocks used by events', () => {
+  const calendar = new ICalendar()
+  calendar.addEvent(new VEvent({
+    start: new Date('2026-07-10T10:00:00Z'),
+    startTz: 'Europe/Moscow',
+    end: new Date('2026-07-10T11:00:00Z'),
+    endTz: 'Europe/Moscow',
+    location: 'America/New_York',
+  }))
+  calendar.addEvent(new VEvent({
+    start: new Date('2026-07-11T10:00:00Z'),
+    startTz: 'Europe/Moscow',
+    end: new Date('2026-07-11T11:00:00Z'),
+    endTz: 'America/New_York',
+  }))
+
+  const ics = calendar.ics
+  assert.equal(ics.match(/BEGIN:VTIMEZONE/g)?.length, 2)
+  assert.equal(ics.match(/TZID:Europe\/Moscow/g)?.length, 1)
+  assert.equal(ics.match(/TZID:America\/New_York/g)?.length, 1)
+  assert.doesNotThrow(() => ICAL.parse(ics))
+})
+
+test('event converts absolute dates to the selected IANA timezone', () => {
+  const event = new VEvent({
+    start: new Date('2024-07-31T11:00:00Z'),
+    startTz: 'Europe/Moscow',
+    end: new Date('2024-07-31T12:00:00Z'),
+    endTz: 'Europe/Moscow',
+  })
+
+  assert.ok(event.ics.includes('DTSTART;TZID=Europe/Moscow:20240731T140000'))
+  assert.ok(event.ics.includes('DTEND;TZID=Europe/Moscow:20240731T150000'))
+})
+
+test('event keeps UTC serialization when no timezone is selected', () => {
+  const event = new VEvent({
+    start: new Date('2024-07-31T11:00:00Z'),
+    end: new Date('2024-07-31T12:00:00Z'),
+  })
+
+  assert.ok(event.ics.includes('DTSTART:20240731T110000Z'))
+  assert.ok(event.ics.includes('DTEND:20240731T120000Z'))
+})
+
+test('manual VTimezone takes priority over the automatic block', () => {
+  const timezone = new VTimezone({ tzid: 'Europe/Moscow' })
+  timezone.addStandard({
+    start: new Date('1970-01-01T00:00:00Z'),
+    tzOffsetFrom: '+0300',
+    tzOffsetTo: '+0300',
+    tzname: 'CUSTOM-MSK',
+  })
+  const calendar = new ICalendar()
+  calendar.addTimezone(timezone)
+  calendar.addEvent(new VEvent({
+    start: new Date('2026-07-10T10:00:00Z'),
+    startTz: 'Europe/Moscow',
+  }))
+
+  const ics = calendar.ics
+  assert.equal(ics.match(/BEGIN:VTIMEZONE/g)?.length, 1)
+  assert.ok(ics.includes('TZNAME:CUSTOM-MSK'))
+  assert.ok(!ics.includes('X-LIC-LOCATION:Europe/Moscow'))
+})
+
+test('event location does not add a VTIMEZONE block', () => {
+  const calendar = new ICalendar()
+  calendar.addEvent(new VEvent({
+    start: new Date('2026-07-10T10:00:00Z'),
+    location: 'Europe/Moscow',
+  }))
+
+  assert.ok(!calendar.ics.includes('BEGIN:VTIMEZONE'))
+})
+
 test('text values are escaped', () => {
   const event = new VEvent({
     start: new Date('2024-06-01T09:00:00Z'),

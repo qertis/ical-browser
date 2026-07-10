@@ -262,7 +262,7 @@ Use UTC dates when possible.
 
 Timezone handling is one of the most compatibility-sensitive parts of iCalendar. When exporting local times, make sure your calendar includes the required timezone information and test the generated `.ics` file in target calendar clients.
 
-The event API supports `startTz` and `endTz` for `TZID` parameters. `VTimezone` can be added to the calendar with `addStandard(...)` and `addDaylight(...)` definitions.
+The event API supports `startTz` and `endTz` for `TZID` parameters. Their IANA timezone definitions are added to the calendar automatically. `VTimezone` can still be added with `addStandard(...)` and `addDaylight(...)` when a custom definition is required.
 
 ## Compatibility notes
 

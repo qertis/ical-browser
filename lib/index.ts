@@ -1,8 +1,13 @@
 import { extension } from 'mime-types'
+import { tzlib_get_ical_block, tzlib_get_timezones } from 'timezones-ical-library'
 import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType, Availability, Available, BusyType, DateListPropertyName } from './types'
 
 interface IBase {
   readonly ics: string
+}
+
+interface ICalendarComponent extends IBase {
+  readonly timezones: readonly string[]
 }
 
 export enum Day {
@@ -16,6 +21,16 @@ export enum Day {
 }
 
 const BR = '\r\n'
+const timezoneNames = tzlib_get_timezones()
+const supportedTimezones = new Set(
+  Array.isArray(timezoneNames) ? timezoneNames : [],
+)
+
+function validateTimezone(timezone: string, property: 'startTz' | 'endTz') {
+  if (!supportedTimezones.has(timezone)) {
+    throw new Error(`${property} must be a valid IANA timezone`)
+  }
+}
 
 function dateWithUTCTime(now: Date) {
   const padTimePart = (value: number) => {
@@ -310,7 +325,7 @@ class VBase {
   }
 }
 
-export class VEvent extends VBase implements IBase {
+export class VEvent extends VBase implements ICalendarComponent {
   #start: Date
   #startTz?: string
   #end?: Date
@@ -366,12 +381,14 @@ export class VEvent extends VBase implements IBase {
       throw new Error('end must be a Date object')
     }
     if (startTz) {
+      validateTimezone(startTz, 'startTz')
       this.#startTz = startTz
     }
     if (end !== undefined) {
       this.#end = end
     }
     if (endTz) {
+      validateTimezone(endTz, 'endTz')
       this.#endTz = endTz
     }
     if (location?.length) {
@@ -430,6 +447,12 @@ export class VEvent extends VBase implements IBase {
 
   addAlarm(alarm: VAlarm) {
     this.#alarms.push(alarm)
+  }
+
+  get timezones(): readonly string[] {
+    return [this.#startTz, this.#endTz].filter(
+      (value): value is string => value !== undefined,
+    )
   }
 
   get ics() {
@@ -1287,7 +1310,7 @@ export class VAlarm implements IBase {
   }
 }
 
-export class VTimezone implements IBase {
+export class VTimezone implements ICalendarComponent {
   #tzid: string // Russian Standard Time
   #standard: Timezone | null
   #daylight: Timezone | null
@@ -1314,6 +1337,10 @@ export class VTimezone implements IBase {
       tzOffsetTo,
       tzname,
     }
+  }
+
+  get timezones(): readonly string[] {
+    return [this.#tzid]
   }
 
   get ics() {
@@ -1419,8 +1446,19 @@ export default class ICalendar {
     temp.push(`PRODID:${this.#prodId}`)
     temp.push(`CALSCALE:${this.#calscale}`)
     temp.push(`METHOD:${this.#method}`)
+    const manualTimezones = new Set(
+      this.#timezones.flatMap(timezone => timezone.timezones),
+     )
     for (const {ics} of this.#timezones) {
       temp.push(ics)
+    }
+    const timezoneIds = new Set(
+      this.#events.flatMap(event => event.timezones),
+    )
+    for (const tzid of timezoneIds) {
+      if (!manualTimezones.has(tzid)) {
+        temp.push(tzlib_get_ical_block(tzid)[0])
+      }
     }
     for (const {ics} of this.#availabilities) {
       temp.push(ics)
