@@ -1,6 +1,32 @@
 import { extension } from 'mime-types'
 import { tzlib_get_ical_block, tzlib_get_timezones } from 'timezones-ical-library'
-import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType, Availability, Available, BusyType, DateListPropertyName } from './types'
+import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType, Availability, Available, BusyType, DateListPropertyName } from './types.js'
+
+export type {
+  Action,
+  Address,
+  Alarm,
+  Availability,
+  Available,
+  BusyType,
+  Calscale,
+  DateListPropertyName,
+  Event,
+  EventStatus,
+  FreeBusy,
+  FreeBusyPeriod,
+  FreeBusyType,
+  Journal,
+  Klass,
+  Method,
+  Rule,
+  RuleDay,
+  RuleFreq,
+  Timezone,
+  Todo,
+  TodoStatus,
+  Transp,
+} from './types.js'
 
 interface IBase {
   readonly ics: string

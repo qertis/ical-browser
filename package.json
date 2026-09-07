@@ -1,22 +1,23 @@
 {
   "name": "ical-browser",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A library for generating iCalendar (ICS) files in Node.js and the browser, supporting events, todos, journals, alarms, and timezones.",
   "type": "module",
   "main": "dist/cjs/index.cjs",
   "module": "dist/esm/index.mjs",
   "source": "lib/index.ts",
-  "typings": "dist/types/types.d.ts",
-  "types": "dist/types/types.d.ts",
+  "typings": "dist/types/index.d.ts",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/types/index.d.ts",
       "require": "./dist/cjs/index.cjs",
       "import": "./dist/esm/index.mjs"
     }
   },
   "scripts": {
     "prebuild": "rm -rf dist",
-    "build": "tsc --build ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json ; mv dist/esm/index.js dist/esm/index.mjs ; mv dist/cjs/index.js dist/cjs/index.cjs",
+    "build": "tsc --build ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json && mv dist/esm/index.js dist/esm/index.mjs && mv dist/cjs/index.js dist/cjs/index.cjs",
     "watch": "tsx watch lib/index.ts",
     "test": "node --import tsx --test test/index.test.ts",
     "prepublish": "npm run build"
@@ -53,11 +54,11 @@
     "@types/mime-types": "^3.0.1",
     "@types/node": "^22.19.17",
     "ical.js": "^2.2.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.7.3"
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "mime-types": "^3.0.2",
-    "timezones-ical-library": "^2.2.1"
+    "timezones-ical-library": "^2.3.1"
   }
 }
