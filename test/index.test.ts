@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import ICAL from 'ical.js'
+import type { RelatedTo, RelType } from '../lib/index'
 import {
   VTodo,
   VEvent,
@@ -13,6 +14,71 @@ import {
   Day,
   default as ICalendar,
 } from '../lib/index'
+
+for (const Component of [VEvent, VTodo, VJournal]) {
+  test(`${Component.name} serializes RELATED-TO relations`, () => {
+    const data = { uid: 'block@example.com', start: new Date('2026-09-15T10:00:00Z') }
+    const relationTypes: RelType[] = ['PARENT', 'CHILD', 'SIBLING']
+    const relations: RelatedTo[] = relationTypes.map(reltype => ({
+      uid: `${reltype.toLowerCase()}@example.com`, reltype,
+    }))
+    for (const relation of relations) {
+      const component = new Component({ ...data, relatedTo: relation })
+      assert.ok(component.ics.includes(`RELATED-TO;RELTYPE=${relation.reltype}:${relation.uid}\r\n`))
+    }
+    const multiple = new Component({ ...data, relatedTo: relations })
+    assert.deepEqual(
+      multiple.ics.split('\r\n').filter(line => line.startsWith('RELATED-TO')),
+      relations.map(({ uid, reltype }) => `RELATED-TO;RELTYPE=${reltype}:${uid}`),
+    )
+    for (const relatedTo of [undefined, []]) {
+      assert.ok(!new Component({ ...data, relatedTo }).ics.includes('RELATED-TO'))
+    }
+  })
+
+  test(`${Component.name} escapes and folds RELATED-TO UID`, () => {
+    const uid = 'отчёт😀'.repeat(20) + ';part,one\\path\nnext@example.com'
+    const component = new Component({
+      uid: 'block@example.com',
+      start: new Date('2026-09-15T10:00:00Z'),
+      relatedTo: { uid, reltype: 'PARENT' },
+    })
+    const ics = component.ics
+    assert.ok(ics.includes('\r\n '))
+    for (const line of ics.split('\r\n')) {
+      assert.ok(Buffer.byteLength(line, 'utf8') <= 75)
+    }
+    const unfolded = ics.replace(/\r\n /g, '')
+    assert.ok(unfolded.includes('\\;part\\,one\\\\path\\nnext@example.com'))
+    const parsed = new ICAL.Component(ICAL.parse(ics))
+    const relation = parsed.getFirstProperty('related-to')!
+    assert.equal(relation.getFirstValue(), uid)
+    assert.equal(relation.getParameter('reltype'), 'PARENT')
+  })
+}
+
+test('event blocks reference the task UID through PARENT', () => {
+  const calendar = new ICalendar()
+  const taskUid = 'report@example.com'
+  calendar.addTodo(new VTodo({ uid: taskUid, summary: 'Prepare report' }))
+  for (const uid of ['block-1@example.com', 'block-2@example.com']) {
+    calendar.addEvent(new VEvent({
+      uid,
+      start: new Date('2026-09-15T10:00:00Z'),
+      relatedTo: { uid: taskUid, reltype: 'PARENT' },
+    }))
+  }
+  const parsed = new ICAL.Component(ICAL.parse(calendar.ics))
+  const todo = parsed.getFirstSubcomponent('vtodo')!
+  const events = parsed.getAllSubcomponents('vevent')
+  assert.equal(events.length, 2)
+  for (const event of events) {
+    const relations = event.getAllProperties('related-to')
+    assert.equal(relations.length, 1)
+    assert.equal(relations[0].getFirstValue(), todo.getFirstPropertyValue('uid'))
+    assert.equal(relations[0].getParameter('reltype'), 'PARENT')
+  }
+})
 
 test('icalendar', () => {
   const valarm = new VAlarm({

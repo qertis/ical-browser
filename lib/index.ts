@@ -1,6 +1,6 @@
 import { extension } from 'mime-types'
 import { tzlib_get_ical_block, tzlib_get_timezones } from 'timezones-ical-library'
-import type { Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType, Availability, Available, BusyType, DateListPropertyName } from './types.js'
+import type { RelatedTo, Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType, Availability, Available, BusyType, DateListPropertyName } from './types.js'
 
 export type {
   Action,
@@ -19,6 +19,8 @@ export type {
   Journal,
   Klass,
   Method,
+  RelatedTo,
+  RelType,
   Rule,
   RuleDay,
   RuleFreq,
@@ -113,6 +115,13 @@ function escapeText(value: string) {
   }
 
   return result
+}
+
+function createRelatedTo(relatedTo: RelatedTo | RelatedTo[]) {
+  const relations = Array.isArray(relatedTo) ? relatedTo : [relatedTo]
+  return relations.map(({ uid, reltype }) =>
+    folding(`RELATED-TO;RELTYPE=${reltype}:${escapeText(uid)}`),
+  )
 }
 
 function textListProperty(name: string, values: string[]) {
@@ -352,6 +361,7 @@ class VBase {
 }
 
 export class VEvent extends VBase implements ICalendarComponent {
+  #relatedTo?: RelatedTo | RelatedTo[]
   #start: Date
   #startTz?: string
   #end?: Date
@@ -469,6 +479,9 @@ export class VEvent extends VBase implements ICalendarComponent {
       this.#xProps![key] = String(data[key])
     }
     this.#alarms = []
+    if (data.relatedTo) {
+      this.#relatedTo = data.relatedTo
+    }
   }
 
   addAlarm(alarm: VAlarm) {
@@ -547,6 +560,9 @@ export class VEvent extends VBase implements ICalendarComponent {
     }
     for (const key in this.#xProps) {
       temp.push(folding(`${key.toUpperCase()}:${escapeText(this.#xProps[key])}`))
+    }
+    if (this.#relatedTo) {
+      temp.push(...createRelatedTo(this.#relatedTo))
     }
     for (const {ics} of this.#alarms) {
       temp.push(ics)
@@ -1045,6 +1061,7 @@ export class VFreeBusy extends VBase implements IBase {
 }
 
 export class VTodo extends VBase implements IBase {
+  #relatedTo?: RelatedTo | RelatedTo[]
   #due?: Date
   #summary?: string
   #description?: string
@@ -1091,6 +1108,9 @@ export class VTodo extends VBase implements IBase {
     if (rrule) {
       this.#rrule = rrule
     }
+    if (data.relatedTo) {
+      this.#relatedTo = data.relatedTo
+    }
     this.#alarms = []
   }
 
@@ -1128,6 +1148,9 @@ export class VTodo extends VBase implements IBase {
     if (this.#rrule) {
       temp.push('RRULE:' + recurrenceRule(this.#rrule))
     }
+    if (this.#relatedTo) {
+      temp.push(...createRelatedTo(this.#relatedTo))
+    }
     for (const {ics} of this.#alarms) {
       temp.push(ics)
     }
@@ -1138,6 +1161,7 @@ export class VTodo extends VBase implements IBase {
 }
 
 export class VJournal extends VBase implements IBase {
+  #relatedTo?: RelatedTo | RelatedTo[]
   #start?: Date
   #summary?: string
   #description?: string
@@ -1163,6 +1187,9 @@ export class VJournal extends VBase implements IBase {
     if (rrule) {
       this.#rrule = rrule
     }
+    if (data.relatedTo) {
+      this.#relatedTo = data.relatedTo
+    }
   }
 
   get ics() {
@@ -1183,6 +1210,9 @@ export class VJournal extends VBase implements IBase {
     }
     if (this.#rrule) {
       temp.push('RRULE:' + recurrenceRule(this.#rrule))
+    }
+    if (this.#relatedTo) {
+      temp.push(...createRelatedTo(this.#relatedTo))
     }
     temp.push('END:VJOURNAL')
 

@@ -1,3 +1,10 @@
+export type RelType = 'PARENT' | 'CHILD' | 'SIBLING'
+
+export type RelatedTo = {
+  uid: string
+  reltype: RelType
+}
+
 export type Address = {
   name: string
   uri: string
@@ -103,6 +110,7 @@ export interface FreeBusy {
 
 export interface Event {
   uid: string
+  relatedTo?: RelatedTo | RelatedTo[]
   location?: string
   geo?: number[]
   summary?: string
@@ -133,6 +141,7 @@ export type Action = 'DISPLAY' | 'AUDIO' | 'EMAIL' | 'PROCEDURE'
 
 export interface Todo {
   uid: string
+  relatedTo?: RelatedTo | RelatedTo[]
   stamp?: Date
   due?: Date
   summary?: string
@@ -146,6 +155,7 @@ export interface Todo {
 
 export interface Journal {
   uid: string
+  relatedTo?: RelatedTo | RelatedTo[]
   stamp?: Date
   start?: Date
   summary?: string
