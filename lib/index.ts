@@ -101,12 +101,7 @@ function escapeText(value: string) {
       }
       result += '\\n'
     } else if (char === '\\') {
-      if (next && ['n', 'N', ';', ',', '\\'].includes(next)) {
-        result += char + next
-        i++
-      } else {
-        result += '\\\\'
-      }
+      result += '\\\\'
     } else if (char === ';' || char === ',') {
       result += '\\' + char
     } else {
@@ -234,25 +229,33 @@ function recurrenceRule({
   return parts.join(';')
 }
 
+// RFC 6868 encoding is distinct from escaping TEXT property values
+function parameterValue(value: string) {
+  const encoded = value.replace(/\^/g, '^^')
+    .replace(/\r\n|\r|\n/g, '^n')
+    .replace(/"/g, "^'")
+  return /[,:;]/.test(encoded) ? `"${encoded}"` : encoded
+}
+
 function createOrganizer(organizer: string | Address | Address[]) {
   let str = ''
   if (Array.isArray(organizer)) {
     // todo - поддержать множество организаторов
     for (const address of organizer) {
       let org = 'ORGANIZER;'
-      org += 'CN=' + address.name
+      org += 'CN=' + parameterValue(address.name)
       if (address.uri) {
         org += `:${createAddressUri(address.uri)}`
       }
-      str += org + BR
+      str += folding(org) + BR
     }
   } else if (typeof organizer === 'object') {
     let org = 'ORGANIZER;'
-    org += 'CN=' + organizer.name
+    org += 'CN=' + parameterValue(organizer.name)
     if (organizer.uri) {
       org += `:${createAddressUri(organizer.uri)}`
     }
-    str += org
+    str += folding(org)
   } else {
     str += `ORGANIZER:${organizer}`
   }
@@ -265,19 +268,19 @@ function createAttendee(attendee: string | Address | Address[]) {
   if (Array.isArray(attendee)) {
     for (const address of attendee) {
       let org = 'ATTENDEE;'
-      org += 'CN=' + address.name
+      org += 'CN=' + parameterValue(address.name)
       if (address.uri) {
         org += `:${createAddressUri(address.uri)}`
       }
-      str += org + BR
+      str += folding(org) + BR
     }
   } else if (typeof attendee === 'object') {
     let org = 'ATTENDEE;'
-    org += 'CN=' + attendee.name
+    org += 'CN=' + parameterValue(attendee.name)
     if (attendee.uri) {
       org += `:${createAddressUri(attendee.uri)}`
     }
-    str += org
+    str += folding(org)
   } else {
     str += attendee.includes(':') && !attendee.startsWith('mailto:')
       ? `ATTENDEE;${attendee}`
@@ -412,9 +415,18 @@ export class VEvent extends VBase implements ICalendarComponent {
     if (!(start instanceof Date)) {
       throw new Error('start must be a Date object')
     }
+    if (!Number.isFinite(start.getTime())) {
+      throw new Error('start must be a valid Date')
+    }
     this.#start = start
     if (end !== undefined && !(end instanceof Date)) {
       throw new Error('end must be a Date object')
+    }
+    if (end !== undefined && !Number.isFinite(end.getTime())) {
+      throw new Error('end must be a valid Date')
+    }
+    if (end !== undefined && end.getTime() <= start.getTime()) {
+      throw new Error('end must be after start')
     }
     if (startTz) {
       validateTimezone(startTz, 'startTz')

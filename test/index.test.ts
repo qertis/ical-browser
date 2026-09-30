@@ -439,7 +439,9 @@ test('VFreeBusy', () => {
   assert.ok(ics.includes('CONTACT:Ops\\, Team'))
   assert.ok(ics.includes('CONTACT:Helpdesk'))
   assert.ok(ics.includes('COMMENT:Known busy period'))
-  assert.ok(ics.includes('COMMENT:Bring \\notes'))
+  assert.ok(ics.includes('COMMENT:Bring \\\\notes'))
+  const parsed = new ICAL.Component(ICAL.parse(ics))
+  assert.equal(parsed.getAllProperties('comment')[1].getFirstValue(), 'Bring \\notes')
   assert.ok(ics.includes('URL;VALUE=URI:https://example.com/free-busy'))
   assert.ok(ics.includes('FREEBUSY:20250201T090000Z/20250201T110000Z'))
   assert.ok(ics.includes('FREEBUSY;FBTYPE=BUSY-TENTATIVE:20250201T130000Z/20250201T140000Z'))
@@ -750,13 +752,10 @@ test('event supports optional end and zero values', () => {
   assert.ok(event.ics.includes('PRIORITY:0'))
   assert.ok(event.ics.includes('SEQUENCE:0'))
 
-  const zeroDurationEvent = new VEvent({
+  assert.throws(() => new VEvent({
     start: new Date('2024-06-01T09:00:00Z'),
     end: new Date('2024-06-01T09:00:00Z'),
-  })
-
-  assert.ok(zeroDurationEvent.ics.includes('DTEND:20240601T090000Z'))
-  assert.ok(!zeroDurationEvent.ics.includes('DURATION:PT1H00M'))
+  }), /end must be after start/)
 })
 
 test('ICalendar automatically adds unique VTIMEZONE blocks used by events', () => {
@@ -825,6 +824,34 @@ test('manual VTimezone takes priority over the automatic block', () => {
   assert.ok(!ics.includes('X-LIC-LOCATION:Europe/Moscow'))
 })
 
+test('manual timezone observances serialize local DTSTART without Z or TZID', () => {
+  const timezone = new VTimezone({ tzid: 'America/New_York' })
+  timezone.addStandard({ start: new Date('2026-11-01T02:00:00Z'), tzOffsetFrom: '-0400', tzOffsetTo: '-0500', tzname: 'EST' })
+  timezone.addDaylight({ start: new Date('2026-03-08T02:00:00Z'), tzOffsetFrom: '-0500', tzOffsetTo: '-0400', tzname: 'EDT' })
+  const parsed = new ICAL.Component(ICAL.parse(timezone.ics))
+  for (const [kind, expected] of [['standard', '20261101T020000'], ['daylight', '20260308T020000']]) {
+    const observance = parsed.getFirstSubcomponent(kind)!
+    const property = observance.getFirstProperty('dtstart')!
+    assert.equal(property.getParameter('tzid'), undefined)
+    assert.equal((property.getFirstValue() as ICAL.Time).zone, ICAL.Timezone.localTimezone)
+    assert.ok(observance.toString().includes(`DTSTART:${expected}\r\n`))
+  }
+})
+
+test('event rejects invalid dates and an end at or before start', () => {
+  const start = new Date('2026-09-30T10:00:00Z')
+  assert.throws(() => new VEvent({ start: new Date('invalid') }), /start must be a valid Date/)
+  assert.throws(() => new VEvent({ start, end: new Date('invalid') }), /end must be a valid Date/)
+  for (const end of [new Date(start), new Date(start.getTime() - 1000)]) {
+    assert.throws(() => new VEvent({ start, end }), /end must be after start/)
+  }
+  assert.doesNotThrow(() => new VEvent({ start }))
+  const event = new VEvent({ start, end: new Date(start.getTime() + 3600000), startTz: 'Europe/Moscow', endTz: 'America/New_York' })
+  const parsed = new ICAL.Component(ICAL.parse(event.ics))
+  assert.ok(parsed.getFirstProperty('dtstart'))
+  assert.ok(parsed.getFirstProperty('dtend'))
+})
+
 test('event location does not add a VTIMEZONE block', () => {
   const calendar = new ICalendar()
   calendar.addEvent(new VEvent({
@@ -833,6 +860,27 @@ test('event location does not add a VTIMEZONE block', () => {
   }))
 
   assert.ok(!calendar.ics.includes('BEGIN:VTIMEZONE'))
+})
+
+test('address names preserve parameter delimiters, quotes, carets and newlines', () => {
+  const names = ['Jane: Doe', 'Jane; Doe', 'Doe, Jane', 'Jane "J" Doe', 'Jane^nDoe', 'Jane\r\nSTATUS:CANCELLED', 'Иван😀'.repeat(30)]
+  for (const name of names) {
+    const address = { name, uri: 'jane@example.com' }
+    for (const value of [address, [address]]) {
+      const event = new VEvent({ start: new Date('2026-09-30T10:00:00Z'), attendee: value, organizer: value })
+      const parsed = new ICAL.Component(ICAL.parse(event.ics))
+      for (const property of ['attendee', 'organizer']) {
+        const properties = parsed.getAllProperties(property)
+        assert.equal(properties.length, 1)
+        assert.equal(properties[0].getFirstValue(), 'mailto:jane@example.com')
+        assert.equal(properties[0].getParameter('cn'), name.replace(/\r\n/g, '\n'))
+      }
+      assert.equal(parsed.getFirstProperty('status'), null)
+      for (const line of event.ics.split('\r\n')) {
+        assert.ok(Buffer.byteLength(line, 'utf8') <= 75)
+      }
+    }
+  }
 })
 
 test('text values are escaped', () => {
@@ -849,6 +897,16 @@ test('text values are escaped', () => {
   assert.ok(event.ics.includes('LOCATION:Room 1\\, Floor 2'))
   assert.ok(event.ics.includes('CATEGORIES:team\\,calendar,planning\\;review'))
   assert.ok(event.ics.includes('X-CUSTOM:a\\,b\\;c'))
+})
+
+test('TEXT serialization preserves literal backslash sequences', () => {
+  const text = String.raw`a\,b\;c\nd\Ne\\f C:\new\notes` + '\nnext'
+  for (const Component of [VEvent, VTodo, VJournal]) {
+    const component = new Component({ start: new Date('2026-09-30T10:00:00Z'), summary: text, description: text })
+    const parsed = new ICAL.Component(ICAL.parse(component.ics))
+    assert.equal(parsed.getFirstPropertyValue('summary'), text)
+    assert.equal(parsed.getFirstPropertyValue('description'), text)
+  }
 })
 
 test('attachments support data urls and uri values', () => {

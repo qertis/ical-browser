@@ -256,45 +256,6 @@ availability.addAvailable(new VAvailable({
 calendar.addAvailability(availability)
 ```
 
-## Timezone notes
-
-Use UTC dates when possible.
-
-Timezone handling is one of the most compatibility-sensitive parts of iCalendar. When exporting local times, make sure your calendar includes the required timezone information and test the generated `.ics` file in target calendar clients.
-
-The event API supports `startTz` and `endTz` for `TZID` parameters. Their IANA timezone definitions are added to the calendar automatically. `VTimezone` can still be added with `addStandard(...)` and `addDaylight(...)` when a custom definition is required.
-
-## Compatibility notes
-
-Generated `.ics` files should be tested in the calendar clients you support, such as Google Calendar, Apple Calendar, Outlook, and Thunderbird.
-
-Calendar clients may interpret advanced iCalendar features differently.
-
-## What this library does not do
-
-`ical-browser` is a writer, not a calendar engine.
-
-It does not:
-
-- parse `.ics` files;
-- calculate available time slots;
-- expand recurring events;
-- merge busy intervals;
-- query external calendars;
-- provide CalDAV integration;
-- send emails;
-- execute alarms;
-- show notifications;
-- resolve booking conflicts.
-
-## Development
-
-```bash
-npm install
-npm run build
-npm test
-```
-
 ## License
 
 Copyright (c) Denis Baskovsky under the MIT license.
