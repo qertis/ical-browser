@@ -1,3 +1,8 @@
+/// <reference lib="esnext.temporal" preserve="true" />
+
+export type CalendarDate = Temporal.PlainDate | Temporal.Instant | Temporal.ZonedDateTime
+export type CalendarMoment = Temporal.Instant | Temporal.ZonedDateTime
+
 export type RelType = 'PARENT' | 'CHILD' | 'SIBLING'
 
 export type RelatedTo = {
@@ -18,7 +23,7 @@ export type Rule = {
   freq: RuleFreq
   count?: number
   interval?: number
-  until?: Date
+  until?: CalendarDate
   wkst?: 'MO' | 'SU'
   byday?: RuleDay | RuleDay[]
   byweekno?: number | number[]
@@ -43,16 +48,14 @@ export type DateListPropertyName = 'RDATE' | 'EXDATE'
 
 export interface Availability {
   uid?: string
-  stamp?: Date
-  start?: Date
-  startTz?: string
-  end?: Date
-  endTz?: string
+  stamp?: Temporal.Instant
+  start?: CalendarMoment
+  end?: CalendarMoment
   duration?: string
   busyType?: BusyType
   klass?: Klass
-  created?: Date
-  lastModified?: Date
+  created?: Temporal.Instant
+  lastModified?: Temporal.Instant
   location?: string
   organizer?: string | Address | Address[]
   priority?: number
@@ -66,29 +69,26 @@ export interface Availability {
 
 export interface Available {
   uid?: string
-  stamp?: Date
-  start: Date
-  startTz?: string
-  end?: Date
-  endTz?: string
+  stamp?: Temporal.Instant
+  start: CalendarMoment
+  end?: CalendarMoment
   duration?: string
-  created?: Date
+  created?: Temporal.Instant
   description?: string
-  lastModified?: Date
+  lastModified?: Temporal.Instant
   location?: string
-  recurrenceId?: Date
-  recurrenceIdTz?: string
+  recurrenceId?: CalendarMoment
   rrule?: Rule
   summary?: string
   categories?: string[]
-  rdate?: Date[]
-  exdate?: Date[]
+  rdate?: CalendarMoment[]
+  exdate?: CalendarMoment[]
   xProps?: { [xKey: string]: string }
 }
 
 export interface FreeBusyPeriod {
-  start: Date
-  end?: Date
+  start: CalendarMoment
+  end?: CalendarMoment
   // Must be an iCalendar duration string, for example PT1H or P1D.
   duration?: string
   type?: FreeBusyType
@@ -96,9 +96,9 @@ export interface FreeBusyPeriod {
 
 export interface FreeBusy {
   uid?: string
-  stamp?: Date
-  start?: Date
-  end?: Date
+  stamp?: Temporal.Instant
+  start?: CalendarMoment
+  end?: CalendarMoment
   organizer?: string | Address | Address[]
   attendee?: string | Address | Address[]
   contact?: string | string[]
@@ -115,11 +115,11 @@ export interface Event {
   geo?: number[]
   summary?: string
   description?: string
-  stamp?: Date
-  start: Date
-  startTz?: string
-  endTz?: string
-  end?: Date
+  stamp?: Temporal.Instant
+  start: CalendarDate
+  end?: CalendarDate
+  startTz?: never
+  endTz?: never
   attach?: string | string[]
   organizer?: string | Address | Address[]
   attendee?: string | Address | Address[]
@@ -127,12 +127,14 @@ export interface Event {
   status?: EventStatus
   categories?: string[]
   rrule?: Rule
+  rdate?: CalendarDate[]
+  exdate?: CalendarDate[]
   klass?: Klass
   transp?: Transp
   sequence?: number
   priority?: number
-  lastModified?: Date
-  [xKey: string]: unknown
+  lastModified?: Temporal.Instant
+  [xKey: `X-${string}` | `x-${string}`]: unknown
 }
 
 export type TodoStatus = 'NEEDS-ACTION' | 'COMPLETED' | 'IN-PROCESS' | 'CANCELLED'
@@ -142,8 +144,8 @@ export type Action = 'DISPLAY' | 'AUDIO' | 'EMAIL' | 'PROCEDURE'
 export interface Todo {
   uid: string
   relatedTo?: RelatedTo | RelatedTo[]
-  stamp?: Date
-  due?: Date
+  stamp?: Temporal.Instant
+  due?: CalendarDate
   summary?: string
   categories?: string[]
   description?: string
@@ -156,8 +158,8 @@ export interface Todo {
 export interface Journal {
   uid: string
   relatedTo?: RelatedTo | RelatedTo[]
-  stamp?: Date
-  start?: Date
+  stamp?: Temporal.Instant
+  start?: CalendarDate
   summary?: string
   description?: string
   rrule?: Rule
@@ -176,7 +178,7 @@ export interface Alarm {
 }
 
 export interface Timezone {
-  start: Date
+  start: Temporal.PlainDateTime
   tzOffsetFrom: string
   tzOffsetTo: string
   tzname: string

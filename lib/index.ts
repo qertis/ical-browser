@@ -1,8 +1,11 @@
 import { extension } from 'mime-types'
-import { tzlib_get_ical_block, tzlib_get_timezones } from 'timezones-ical-library'
-import type { RelatedTo, Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType, Availability, Available, BusyType, DateListPropertyName } from './types.js'
+import { tzlib_get_ical_block } from 'timezones-ical-library'
+import { isSecondOccurrence, validateRule } from './validate-rule.js'
+import type { CalendarDate, CalendarMoment, RelatedTo, Address, Event, Todo, Journal, Alarm, Timezone, Rule, Klass, Transp, Method, Calscale, FreeBusy, FreeBusyPeriod, FreeBusyType, Availability, Available, BusyType, DateListPropertyName } from './types.js'
 
 export type {
+  CalendarDate,
+  CalendarMoment,
   Action,
   Address,
   Alarm,
@@ -49,43 +52,67 @@ export enum Day {
 }
 
 const BR = '\r\n'
-const timezoneNames = tzlib_get_timezones()
-const supportedTimezones = new Set(
-  Array.isArray(timezoneNames) ? timezoneNames : [],
-)
 
-function validateTimezone(timezone: string, property: 'startTz' | 'endTz') {
-  if (!supportedTimezones.has(timezone)) {
-    throw new Error(`${property} must be a valid IANA timezone`)
+function asInstant(value: CalendarMoment): Temporal.Instant {
+  return Temporal.Instant.fromEpochNanoseconds(value.epochNanoseconds)
+}
+
+function compareMoments(start: CalendarMoment, end: CalendarMoment): number {
+  // iCalendar DATE-TIME has second precision, so distinct subsecond inputs
+  // must not produce equal or inverted boundaries after serialization.
+  return Temporal.Instant.compare(
+    asInstant(start).round({ smallestUnit: 'second', roundingMode: 'floor' }),
+    asInstant(end).round({ smallestUnit: 'second', roundingMode: 'floor' }),
+  )
+}
+
+function validateEnd(start: CalendarDate, end?: CalendarDate) {
+  if (end === undefined) return
+
+  if ((start instanceof Temporal.PlainDate) !== (end instanceof Temporal.PlainDate)) {
+    throw new Error('start and end must both be dates or both be moments')
   }
+  const comparison = start instanceof Temporal.PlainDate
+    ? Temporal.PlainDate.compare(start, end as Temporal.PlainDate)
+    : compareMoments(start, end as CalendarMoment)
+  if (comparison >= 0) throw new Error('end must be after start')
 }
 
-function dateWithUTCTime(now: Date) {
-  const padTimePart = (value: number) => {
-    return value.toString().padStart(2, '0')
+function compactDate(value: Temporal.PlainDate): string {
+  return value.toString({ calendarName: 'never' }).replaceAll('-', '')
+}
+
+function compactDateTime(value: Temporal.PlainDateTime): string {
+  return value.toString({ calendarName: 'never', smallestUnit: 'second' }).replaceAll('-', '').replaceAll(':', '')
+}
+
+function dateWithUTCTime(now: CalendarMoment) {
+  return compactDateTime(asInstant(now).toZonedDateTimeISO('UTC').toPlainDateTime())
+}
+
+function usesLocalTimezone(value: Temporal.ZonedDateTime): boolean {
+  if (value.timeZoneId.startsWith('+') || value.timeZoneId.startsWith('-')) {
+    return false
   }
-  return `${now.getUTCFullYear()}${padTimePart(now.getUTCMonth() + 1)}${padTimePart(now.getUTCDate())}T${padTimePart(now.getUTCHours())}${padTimePart(now.getUTCMinutes())}${padTimePart(now.getUTCSeconds())}`
+  return !isSecondOccurrence(value)
 }
 
-function dateWithTimeZone(now: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(now)
-  const byType = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
-
-  return `${byType.year}${byType.month}${byType.day}T${byType.hour}${byType.minute}${byType.second}`
+function dateTimeProperty(now: CalendarDate) {
+  if (now instanceof Temporal.PlainDate) {
+    return `;VALUE=DATE:${compactDate(now)}`
+  }
+  if (now instanceof Temporal.ZonedDateTime) {
+    // Fixed offsets and the second occurrence of repeated time need UTC to preserve the selected moment; the first occurrence keeps its TZID
+    if (!usesLocalTimezone(now)) {
+      return `:${dateWithUTCTime(now)}Z`
+    }
+    return `;TZID=${now.timeZoneId}:${compactDateTime(now.toPlainDateTime())}`
+  }
+  return `:${dateWithUTCTime(now)}Z`
 }
 
-function dateTimeProperty(now: Date, timezone?: string) {
-  const value = timezone ? dateWithTimeZone(now, timezone) : dateWithUTCTime(now) + 'Z'
-  return timezone ? `;TZID=${timezone}:${value}` : `:${value}`
+function dateTimezones(...values: (CalendarDate | undefined)[]): string[] {
+  return values.flatMap(value => value instanceof Temporal.ZonedDateTime && usesLocalTimezone(value) ? [value.timeZoneId] : [])
 }
 
 function escapeText(value: string) {
@@ -123,17 +150,18 @@ function textListProperty(name: string, values: string[]) {
   return folding(`${name}:${values.map(escapeText).join(',')}`)
 }
 
-function dateListProperty(name: DateListPropertyName, dates: Date[], tz?: string) {
-  const value = dates.map(date => {
-    if (!(date instanceof Date)) {
-      throw new Error(`${name.toLowerCase()} must contain Date objects`)
+function dateListProperty(name: DateListPropertyName, dates: CalendarDate[], start?: CalendarDate) {
+  if (!dates.length) {
+    return ''
+  }
+  const isDate = (start ?? dates[0]) instanceof Temporal.PlainDate
+  for (const date of dates) {
+    if ((date instanceof Temporal.PlainDate) !== isDate) {
+      throw new Error(`${name} must have the same value type as DTSTART`)
     }
-
-    return tz ? dateWithTimeZone(date, tz) : dateWithUTCTime(date) + 'Z'
-  }).join(',')
-  const params = tz ? `;TZID=${tz}` : ''
-
-  return folding(`${name}${params}:${value}`)
+  }
+  const values = dates.map(date => date instanceof Temporal.PlainDate ? compactDate(date) : dateWithUTCTime(date) + 'Z')
+  return folding(`${name}${isDate ? ';VALUE=DATE' : ''}:${values.join(',')}`)
 }
 
 // RFC 5545: lines MUST NOT be longer than 75 octets (bytes), excluding the line break.
@@ -213,7 +241,7 @@ function recurrenceRule({
     parts.push(`COUNT=${count}`)
   }
   if (until) {
-    parts.push('UNTIL=' + dateWithUTCTime(until) + 'Z')
+    parts.push('UNTIL=' + (until instanceof Temporal.PlainDate ? compactDate(until) : dateWithUTCTime(until) + 'Z'))
   }
   if (wkst) {
     parts.push(`WKST=${wkst}`)
@@ -355,20 +383,19 @@ function validatePriority(priority?: number) {
 
 class VBase {
   protected uid: string
-  protected stamp: Date
+  protected stamp: Temporal.Instant
 
-  constructor({ uid, stamp }: { uid?: string, stamp?: Date }) {
+  constructor({ uid, stamp }: { uid?: string, stamp?: Temporal.Instant }) {
     this.uid = uid ?? globalThis.crypto.randomUUID()
-    this.stamp = stamp ?? new Date()
+
+    this.stamp = stamp ?? Temporal.Now.instant()
   }
 }
 
 export class VEvent extends VBase implements ICalendarComponent {
   #relatedTo?: RelatedTo | RelatedTo[]
-  #start: Date
-  #startTz?: string
-  #end?: Date
-  #endTz?: string
+  #start: CalendarDate
+  #end?: CalendarDate
   #location?: string
   #geo?: number[]
   #summary?: string
@@ -384,7 +411,9 @@ export class VEvent extends VBase implements ICalendarComponent {
   #transp?: Transp
   #sequence?: number
   #rrule?: Rule
-  #lastModified?: Date
+  #rdate?: CalendarDate[]
+  #exdate?: CalendarDate[]
+  #lastModified?: Temporal.Instant
   #alarms: VAlarm[]
   #xProps?: { [xKey: string]: string } = {}
 
@@ -396,9 +425,7 @@ export class VEvent extends VBase implements ICalendarComponent {
       summary,
       description,
       start,
-      startTz,
       end,
-      endTz,
       attach,
       organizer,
       attendee,
@@ -412,32 +439,19 @@ export class VEvent extends VBase implements ICalendarComponent {
       priority,
       lastModified,
     } = data
-    if (!(start instanceof Date)) {
-      throw new Error('start must be a Date object')
-    }
-    if (!Number.isFinite(start.getTime())) {
-      throw new Error('start must be a valid Date')
-    }
+
     this.#start = start
-    if (end !== undefined && !(end instanceof Date)) {
-      throw new Error('end must be a Date object')
+    validateEnd(start, end)
+    if (data.rdate) {
+      dateListProperty('RDATE', data.rdate, start)
+      this.#rdate = data.rdate.slice()
     }
-    if (end !== undefined && !Number.isFinite(end.getTime())) {
-      throw new Error('end must be a valid Date')
-    }
-    if (end !== undefined && end.getTime() <= start.getTime()) {
-      throw new Error('end must be after start')
-    }
-    if (startTz) {
-      validateTimezone(startTz, 'startTz')
-      this.#startTz = startTz
+    if (data.exdate) {
+      dateListProperty('EXDATE', data.exdate, start)
+      this.#exdate = data.exdate.slice()
     }
     if (end !== undefined) {
       this.#end = end
-    }
-    if (endTz) {
-      validateTimezone(endTz, 'endTz')
-      this.#endTz = endTz
     }
     if (location?.length) {
       this.#location = location
@@ -482,13 +496,14 @@ export class VEvent extends VBase implements ICalendarComponent {
       this.#sequence = sequence
     }
     if (rrule) {
+      validateRule(rrule, start)
       this.#rrule = rrule
     }
-    if (lastModified instanceof Date) {
+    if (lastModified !== undefined) {
       this.#lastModified = lastModified
     }
-    for (const key of Object.keys(data).filter(key => key.toUpperCase().startsWith('X-'))) {
-      this.#xProps![key] = String(data[key])
+    for (const [key, value] of Object.entries(data).filter(([key]) => key.toUpperCase().startsWith('X-'))) {
+      this.#xProps![key] = String(value)
     }
     this.#alarms = []
     if (data.relatedTo) {
@@ -501,9 +516,7 @@ export class VEvent extends VBase implements ICalendarComponent {
   }
 
   get timezones(): readonly string[] {
-    return [this.#startTz, this.#endTz].filter(
-      (value): value is string => value !== undefined,
-    )
+    return dateTimezones(this.#start, this.#end)
   }
 
   get ics() {
@@ -514,10 +527,10 @@ export class VEvent extends VBase implements ICalendarComponent {
     if (this.#lastModified) {
       temp.push(`LAST-MODIFIED${dateTimeProperty(this.#lastModified)}`)
     }
-    temp.push(`DTSTART${dateTimeProperty(this.#start, this.#startTz)}`)
+    temp.push(`DTSTART${dateTimeProperty(this.#start)}`)
 
     if (this.#end !== undefined) {
-      temp.push(`DTEND${dateTimeProperty(this.#end, this.#endTz)}`)
+      temp.push(`DTEND${dateTimeProperty(this.#end)}`)
     }
     if (this.#location) {
       temp.push(folding(`LOCATION:${escapeText(this.#location)}`))
@@ -568,8 +581,10 @@ export class VEvent extends VBase implements ICalendarComponent {
       temp.push(`SEQUENCE:${this.#sequence}`)
     }
     if (this.#rrule) {
-      temp.push('RRULE:' + recurrenceRule(this.#rrule))
+      temp.push(folding('RRULE:' + recurrenceRule(this.#rrule)))
     }
+    if (this.#rdate?.length) temp.push(dateListProperty('RDATE', this.#rdate, this.#start))
+    if (this.#exdate?.length) temp.push(dateListProperty('EXDATE', this.#exdate, this.#start))
     for (const key in this.#xProps) {
       temp.push(folding(`${key.toUpperCase()}:${escapeText(this.#xProps[key])}`))
     }
@@ -585,39 +600,33 @@ export class VEvent extends VBase implements ICalendarComponent {
   }
 }
 
-export class VAvailable extends VBase implements IBase {
-  #start: Date
-  #startTz?: string
-  #end?: Date
-  #endTz?: string
+export class VAvailable extends VBase implements ICalendarComponent {
+  #start: CalendarMoment
+  #end?: CalendarMoment
   #duration?: string
-  #created?: Date
+  #created?: Temporal.Instant
   #description?: string
-  #lastModified?: Date
+  #lastModified?: Temporal.Instant
   #location?: string
-  #recurrenceId?: Date
-  #recurrenceIdTz?: string
+  #recurrenceId?: CalendarMoment
   #rrule?: Rule
   #summary?: string
   #categories?: string[]
-  #rdate?: Date[]
-  #exdate?: Date[]
+  #rdate?: CalendarMoment[]
+  #exdate?: CalendarMoment[]
   #xProps?: { [xKey: string]: string } = {}
 
   constructor(data: Available) {
     super(data)
     const {
       start,
-      startTz,
       end,
-      endTz,
       duration,
       created,
       description,
       lastModified,
       location,
       recurrenceId,
-      recurrenceIdTz,
       rrule,
       summary,
       categories,
@@ -626,49 +635,37 @@ export class VAvailable extends VBase implements IBase {
       xProps,
     } = data
 
-    if (!(start instanceof Date)) {
-      throw new Error('start must be a Date object')
-    }
     if (end !== undefined && duration !== undefined) {
       throw new Error('end and duration must not be used together')
     }
-    if (end !== undefined && !(end instanceof Date)) {
-      throw new Error('end must be a Date object')
-    }
+
     validateXProps(xProps)
 
     this.#start = start
-    if (startTz) {
-      this.#startTz = startTz
-    }
+    validateEnd(start, end)
     if (end !== undefined) {
       this.#end = end
-    }
-    if (endTz) {
-      this.#endTz = endTz
     }
     if (duration) {
       this.#duration = duration
     }
-    if (created instanceof Date) {
+    if (created !== undefined) {
       this.#created = created
     }
     if (description?.length) {
       this.#description = description
     }
-    if (lastModified instanceof Date) {
+    if (lastModified !== undefined) {
       this.#lastModified = lastModified
     }
     if (location?.length) {
       this.#location = location
     }
-    if (recurrenceId instanceof Date) {
+    if (recurrenceId !== undefined) {
       this.#recurrenceId = recurrenceId
     }
-    if (recurrenceIdTz) {
-      this.#recurrenceIdTz = recurrenceIdTz
-    }
     if (rrule) {
+      validateRule(rrule, start)
       this.#rrule = rrule
     }
     if (summary?.length) {
@@ -678,14 +675,20 @@ export class VAvailable extends VBase implements IBase {
       this.#categories = categories
     }
     if (rdate) {
-      this.#rdate = rdate
+      dateListProperty('RDATE', rdate, start)
+      this.#rdate = rdate.slice()
     }
     if (exdate) {
-      this.#exdate = exdate
+      dateListProperty('EXDATE', exdate, start)
+      this.#exdate = exdate.slice()
     }
     if (xProps) {
       this.#xProps = xProps
     }
+  }
+
+  get timezones(): readonly string[] {
+    return dateTimezones(this.#start, this.#end, this.#recurrenceId)
   }
 
   get ics() {
@@ -693,9 +696,9 @@ export class VAvailable extends VBase implements IBase {
     temp.push('BEGIN:AVAILABLE')
     temp.push(`UID:${this.uid}`)
     temp.push(`DTSTAMP${dateTimeProperty(this.stamp)}`)
-    temp.push(`DTSTART${dateTimeProperty(this.#start, this.#startTz)}`)
+    temp.push(`DTSTART${dateTimeProperty(this.#start)}`)
     if (this.#end !== undefined) {
-      temp.push(`DTEND${dateTimeProperty(this.#end, this.#endTz)}`)
+      temp.push(`DTEND${dateTimeProperty(this.#end)}`)
     }
     if (this.#duration) {
       temp.push(`DURATION:${this.#duration}`)
@@ -713,10 +716,10 @@ export class VAvailable extends VBase implements IBase {
       temp.push(folding(`LOCATION:${escapeText(this.#location)}`))
     }
     if (this.#recurrenceId) {
-      temp.push(`RECURRENCE-ID${dateTimeProperty(this.#recurrenceId, this.#recurrenceIdTz)}`)
+      temp.push(`RECURRENCE-ID${dateTimeProperty(this.#recurrenceId)}`)
     }
     if (this.#rrule) {
-      temp.push('RRULE:' + recurrenceRule(this.#rrule))
+      temp.push(folding('RRULE:' + recurrenceRule(this.#rrule)))
     }
     if (this.#summary) {
       temp.push(folding(`SUMMARY:${escapeText(this.#summary)}`))
@@ -724,11 +727,11 @@ export class VAvailable extends VBase implements IBase {
     if (this.#categories) {
       temp.push(textListProperty('CATEGORIES', this.#categories))
     }
-    if (this.#rdate) {
-      temp.push(dateListProperty('RDATE', this.#rdate))
+    if (this.#rdate?.length) {
+      temp.push(dateListProperty('RDATE', this.#rdate, this.#start))
     }
-    if (this.#exdate) {
-      temp.push(dateListProperty('EXDATE', this.#exdate))
+    if (this.#exdate?.length) {
+      temp.push(dateListProperty('EXDATE', this.#exdate, this.#start))
     }
     for (const key in this.#xProps) {
       temp.push(folding(`${key.toUpperCase()}:${escapeText(this.#xProps[key])}`))
@@ -739,16 +742,14 @@ export class VAvailable extends VBase implements IBase {
   }
 }
 
-export class VAvailability extends VBase implements IBase {
-  #start?: Date
-  #startTz?: string
-  #end?: Date
-  #endTz?: string
+export class VAvailability extends VBase implements ICalendarComponent {
+  #start?: CalendarMoment
+  #end?: CalendarMoment
   #duration?: string
   #busyType?: BusyType
   #klass?: Klass
-  #created?: Date
-  #lastModified?: Date
+  #created?: Temporal.Instant
+  #lastModified?: Temporal.Instant
   #location?: string
   #organizer?: string | Address | Address[]
   #priority?: number
@@ -764,9 +765,7 @@ export class VAvailability extends VBase implements IBase {
     super(data)
     const {
       start,
-      startTz,
       end,
-      endTz,
       duration,
       busyType,
       klass,
@@ -783,8 +782,8 @@ export class VAvailability extends VBase implements IBase {
       xProps,
     } = data
 
-    if (start !== undefined && !(start instanceof Date)) {
-      throw new Error('start must be a Date object')
+    if (start !== undefined) {
+      validateEnd(start, end)
     }
     if (end !== undefined && duration !== undefined) {
       throw new Error('end and duration must not be used together')
@@ -792,9 +791,7 @@ export class VAvailability extends VBase implements IBase {
     if (duration !== undefined && start === undefined) {
       throw new Error('duration must not be used without start')
     }
-    if (end !== undefined && !(end instanceof Date)) {
-      throw new Error('end must be a Date object')
-    }
+
     validateBusyType(busyType)
     validatePriority(priority)
     validateXProps(xProps)
@@ -802,14 +799,8 @@ export class VAvailability extends VBase implements IBase {
     if (start !== undefined) {
       this.#start = start
     }
-    if (startTz) {
-      this.#startTz = startTz
-    }
     if (end !== undefined) {
       this.#end = end
-    }
-    if (endTz) {
-      this.#endTz = endTz
     }
     if (duration) {
       this.#duration = duration
@@ -820,10 +811,10 @@ export class VAvailability extends VBase implements IBase {
     if (klass) {
       this.#klass = klass
     }
-    if (created instanceof Date) {
+    if (created !== undefined) {
       this.#created = created
     }
-    if (lastModified instanceof Date) {
+    if (lastModified !== undefined) {
       this.#lastModified = lastModified
     }
     if (location?.length) {
@@ -863,6 +854,10 @@ export class VAvailability extends VBase implements IBase {
     this.#available.push(available)
   }
 
+  get timezones(): readonly string[] {
+    return [...dateTimezones(this.#start, this.#end), ...this.#available.flatMap(value => value.timezones)]
+  }
+
   get ics() {
     const temp: string[] = []
     temp.push('BEGIN:VAVAILABILITY')
@@ -881,10 +876,10 @@ export class VAvailability extends VBase implements IBase {
       temp.push(folding(`DESCRIPTION:${escapeText(this.#description)}`))
     }
     if (this.#start) {
-      temp.push(`DTSTART${dateTimeProperty(this.#start, this.#startTz)}`)
+      temp.push(`DTSTART${dateTimeProperty(this.#start)}`)
     }
     if (this.#end) {
-      temp.push(`DTEND${dateTimeProperty(this.#end, this.#endTz)}`)
+      temp.push(`DTEND${dateTimeProperty(this.#end)}`)
     }
     if (this.#duration) {
       temp.push(`DURATION:${this.#duration}`)
@@ -926,8 +921,8 @@ export class VAvailability extends VBase implements IBase {
 }
 
 export class VFreeBusy extends VBase implements IBase {
-  #start?: Date
-  #end?: Date
+  #start?: CalendarMoment
+  #end?: CalendarMoment
   #organizer?: string | Address | Address[]
   #attendee?: string | Address | Address[]
   #contact?: string | string[]
@@ -953,13 +948,9 @@ export class VFreeBusy extends VBase implements IBase {
     if (!freeBusy || freeBusy.length === 0) {
       throw new Error('freeBusy must contain at least one period')
     }
-    if (start && !(start instanceof Date)) {
-      throw new Error('start must be a Date object')
-    }
-    if (end && !(end instanceof Date)) {
-      throw new Error('end must be a Date object')
-    }
-    if (start && end && end <= start) {
+
+
+    if (start && end && compareMoments(start, end) >= 0) {
       throw new Error('end must be after start')
     }
     for (const period of freeBusy) {
@@ -995,19 +986,14 @@ export class VFreeBusy extends VBase implements IBase {
   }
 
   #validatePeriod(period: FreeBusyPeriod) {
-    if (!(period.start instanceof Date)) {
-      throw new Error('freeBusy period start must be a Date object')
-    }
     if (!period.end && !period.duration) {
       throw new Error('freeBusy period must include either end or duration')
     }
     if (period.end && period.duration) {
       throw new Error('freeBusy period must not include both end and duration')
     }
-    if (period.end && !(period.end instanceof Date)) {
-      throw new Error('freeBusy period end must be a Date object')
-    }
-    if (period.end && period.end <= period.start) {
+
+    if (period.end && compareMoments(period.start, period.end) >= 0) {
       throw new Error('freeBusy period end must be after start')
     }
     validateFreeBusyType(period.type)
@@ -1040,10 +1026,10 @@ export class VFreeBusy extends VBase implements IBase {
     temp.push(`UID:${this.uid}`)
     temp.push(`DTSTAMP${dateTimeProperty(this.stamp)}`)
     if (this.#start) {
-      temp.push(`DTSTART${dateTimeProperty(this.#start)}`)
+      temp.push(`DTSTART${dateTimeProperty(asInstant(this.#start))}`)
     }
     if (this.#end) {
-      temp.push(`DTEND${dateTimeProperty(this.#end)}`)
+      temp.push(`DTEND${dateTimeProperty(asInstant(this.#end))}`)
     }
     if (this.#organizer) {
       this.#pushAddress(temp, createOrganizer(this.#organizer))
@@ -1072,9 +1058,9 @@ export class VFreeBusy extends VBase implements IBase {
   }
 }
 
-export class VTodo extends VBase implements IBase {
+export class VTodo extends VBase implements ICalendarComponent {
   #relatedTo?: RelatedTo | RelatedTo[]
-  #due?: Date
+  #due?: CalendarDate
   #summary?: string
   #description?: string
   #status?: string
@@ -1096,7 +1082,7 @@ export class VTodo extends VBase implements IBase {
       categories,
       rrule,
     } = data
-    if (due instanceof Date) {
+    if (due !== undefined) {
       this.#due = due
     }
     if (summary?.length) {
@@ -1118,6 +1104,7 @@ export class VTodo extends VBase implements IBase {
       this.#priority = priority
     }
     if (rrule) {
+      validateRule(rrule, due)
       this.#rrule = rrule
     }
     if (data.relatedTo) {
@@ -1130,14 +1117,17 @@ export class VTodo extends VBase implements IBase {
     this.#alarms.push(alarm)
   }
 
+  get timezones(): readonly string[] {
+    return dateTimezones(this.#due)
+  }
+
   get ics() {
     const temp: string[] = []
     temp.push('BEGIN:VTODO')
     temp.push('UID:' + this.uid)
     temp.push(`DTSTAMP${dateTimeProperty(this.stamp)}`)
     if (this.#due) {
-      // todo поддержать VALUE=DATE если не указано время, а указана только дата
-      temp.push(`DUE;VALUE=DATE-TIME${dateTimeProperty(this.#due)}`)
+      temp.push(`DUE${dateTimeProperty(this.#due)}`)
     }
     if (this.#summary) {
       temp.push(folding(`SUMMARY:${escapeText(this.#summary)}`))
@@ -1158,7 +1148,7 @@ export class VTodo extends VBase implements IBase {
       temp.push('STATUS:' + this.#status)
     }
     if (this.#rrule) {
-      temp.push('RRULE:' + recurrenceRule(this.#rrule))
+      temp.push(folding('RRULE:' + recurrenceRule(this.#rrule)))
     }
     if (this.#relatedTo) {
       temp.push(...createRelatedTo(this.#relatedTo))
@@ -1172,9 +1162,9 @@ export class VTodo extends VBase implements IBase {
   }
 }
 
-export class VJournal extends VBase implements IBase {
+export class VJournal extends VBase implements ICalendarComponent {
   #relatedTo?: RelatedTo | RelatedTo[]
-  #start?: Date
+  #start?: CalendarDate
   #summary?: string
   #description?: string
   #rrule?: Rule
@@ -1187,7 +1177,7 @@ export class VJournal extends VBase implements IBase {
       description,
       rrule,
     } = data
-    if (start instanceof Date) {
+    if (start !== undefined) {
       this.#start = start
     }
     if (summary?.length) {
@@ -1197,11 +1187,16 @@ export class VJournal extends VBase implements IBase {
       this.#description = description
     }
     if (rrule) {
+      validateRule(rrule, start)
       this.#rrule = rrule
     }
     if (data.relatedTo) {
       this.#relatedTo = data.relatedTo
     }
+  }
+
+  get timezones(): readonly string[] {
+    return dateTimezones(this.#start)
   }
 
   get ics() {
@@ -1221,7 +1216,7 @@ export class VJournal extends VBase implements IBase {
       temp.push(folding(`DESCRIPTION:${escapeText(this.#description)}`))
     }
     if (this.#rrule) {
-      temp.push('RRULE:' + recurrenceRule(this.#rrule))
+      temp.push(folding('RRULE:' + recurrenceRule(this.#rrule)))
     }
     if (this.#relatedTo) {
       temp.push(...createRelatedTo(this.#relatedTo))
@@ -1418,7 +1413,7 @@ export class VTimezone implements ICalendarComponent {
 
     if (this.#standard) {
       temp.push('BEGIN:STANDARD')
-      temp.push(`DTSTART:${dateWithUTCTime(this.#standard.start)}`)
+      temp.push(`DTSTART:${compactDateTime(this.#standard.start)}`)
       temp.push(`TZOFFSETFROM:${this.#standard.tzOffsetFrom}`)
       temp.push(`TZOFFSETTO:${this.#standard.tzOffsetTo}`)
       temp.push(folding(`TZNAME:${escapeText(this.#standard.tzname)}`))
@@ -1426,7 +1421,7 @@ export class VTimezone implements ICalendarComponent {
     }
     if (this.#daylight) {
       temp.push('BEGIN:DAYLIGHT')
-      temp.push(`DTSTART:${dateWithUTCTime(this.#daylight.start)}`)
+      temp.push(`DTSTART:${compactDateTime(this.#daylight.start)}`)
       temp.push(`TZOFFSETFROM:${this.#daylight.tzOffsetFrom}`)
       temp.push(`TZOFFSETTO:${this.#daylight.tzOffsetTo}`)
       temp.push(folding(`TZNAME:${escapeText(this.#daylight.tzname)}`))
@@ -1521,11 +1516,13 @@ export default class ICalendar {
       temp.push(ics)
     }
     const timezoneIds = new Set(
-      this.#events.flatMap(event => event.timezones),
+      [...this.#events, ...this.#todos, ...this.#journals, ...this.#availabilities].flatMap(component => component.timezones),
     )
     for (const tzid of timezoneIds) {
       if (!manualTimezones.has(tzid)) {
-        temp.push(tzlib_get_ical_block(tzid)[0])
+        const block = tzlib_get_ical_block(tzid)?.[0]
+        if (!block) throw new Error(`No automatic VTIMEZONE definition for ${tzid}; add a VTimezone manually`)
+        temp.push(block)
       }
     }
     for (const {ics} of this.#availabilities) {

@@ -8,4 +8,4 @@
 
 - Preserve browser and Node.js compatibility in runtime changes.
 - Keep generated iCalendar data standards-compliant. For changes to runtime code or public APIs, run `npm test` and `npm run build`.
-- Treat timezone serialization as compatibility-sensitive. `startTz` and `endTz` use IANA timezones and cause their definitions to be added to the calendar; use `VTimezone` for custom definitions. Check affected timezone output in supported calendar clients when practical.
+- Treat timezone serialization as compatibility-sensitive. `Temporal.ZonedDateTime` carries an IANA timezone and causes its definition to be added to the calendar when serialized with `TZID`; use `VTimezone` for custom definitions. Check affected timezone output in supported calendar clients when practical.

@@ -17,7 +17,7 @@ import {
 
 for (const Component of [VEvent, VTodo, VJournal]) {
   test(`${Component.name} serializes RELATED-TO relations`, () => {
-    const data = { uid: 'block@example.com', start: new Date('2026-09-15T10:00:00Z') }
+    const data = { uid: 'block@example.com', start: Temporal.Instant.from('2026-09-15T10:00:00Z') }
     const relationTypes: RelType[] = ['PARENT', 'CHILD', 'SIBLING']
     const relations: RelatedTo[] = relationTypes.map(reltype => ({
       uid: `${reltype.toLowerCase()}@example.com`, reltype,
@@ -40,7 +40,7 @@ for (const Component of [VEvent, VTodo, VJournal]) {
     const uid = 'отчёт😀'.repeat(20) + ';part,one\\path\nnext@example.com'
     const component = new Component({
       uid: 'block@example.com',
-      start: new Date('2026-09-15T10:00:00Z'),
+      start: Temporal.Instant.from('2026-09-15T10:00:00Z'),
       relatedTo: { uid, reltype: 'PARENT' },
     })
     const ics = component.ics
@@ -64,7 +64,7 @@ test('event blocks reference the task UID through PARENT', () => {
   for (const uid of ['block-1@example.com', 'block-2@example.com']) {
     calendar.addEvent(new VEvent({
       uid,
-      start: new Date('2026-09-15T10:00:00Z'),
+      start: Temporal.Instant.from('2026-09-15T10:00:00Z'),
       relatedTo: { uid: taskUid, reltype: 'PARENT' },
     }))
   }
@@ -91,13 +91,13 @@ test('icalendar', () => {
 
   const vtimezone = new VTimezone({ tzid: 'America/New_York' })
   vtimezone.addStandard({
-    start: new Date('2023-11-05T02:00:00.611Z'),
+    start: Temporal.PlainDateTime.from('2023-11-05T02:00:00.611'),
     tzOffsetFrom: '-0400',
     tzOffsetTo: '-0500',
     tzname: 'EST',
   })
   vtimezone.addDaylight({
-    start: new Date('2024-03-10T02:00:00.611Z'),
+    start: Temporal.PlainDateTime.from('2024-03-10T02:00:00.611'),
     tzOffsetFrom: '-0500',
     tzOffsetTo: '-0400',
     tzname: 'EDT',
@@ -110,12 +110,10 @@ test('icalendar', () => {
     categories: ['test', 'example'],
     summary: 'Event summary',
     description: 'Event description',
-    stamp: new Date(),
-    start: new Date('2024-01-01T10:10:00.611Z'),
-    startTz: 'America/New_York',
-    end: new Date('2024-01-02T10:12:00.611Z'),
-    endTz: 'America/New_York',
-    lastModified: new Date('2024-07-30T07:26:28Z'),
+    stamp: Temporal.Now.instant(),
+    start: Temporal.Instant.from('2024-01-01T10:10:00.611Z').toZonedDateTimeISO('America/New_York'),
+    end: Temporal.Instant.from('2024-01-02T10:12:00.611Z').toZonedDateTimeISO('America/New_York'),
+    lastModified: Temporal.Instant.from('2024-07-30T07:26:28Z'),
     attach: [
       'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQEAAAAACwAAAAAAQABAAACAkQBADs='
     ],
@@ -134,9 +132,8 @@ test('icalendar', () => {
     priority: 5,
     rrule: {
       freq: 'WEEKLY',
-      count: 10,
       interval: 2,
-      until: new Date('2024-12-31T23:59:59.611Z'),
+      until: Temporal.Instant.from('2024-12-31T23:59:59.611Z'),
       wkst: 'MO',
       byday: ['MO', 'WE', 'FR'],
       bymonthday: [5, 15, 25],
@@ -165,13 +162,13 @@ test('icalendar', () => {
   assert.ok(event.includes('DTSTART;TZID=America/New_York:20240101T051000'))
   assert.ok(event.includes('DTEND;TZID=America/New_York:20240102T051200'))
   assert.ok(event.includes('LAST-MODIFIED:20240730T072628Z'))
-  assert.ok(event.includes('RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=10;UNTIL=20241231T235959Z;WKST=MO;BYDAY=MO,WE,FR;BYWEEKNO=10,20;BYMONTHDAY=5,15,25;BYYEARDAY=100,200'))
+  assert.ok(event.replace(/\r\n /g, '').includes('RRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=20241231T235959Z;WKST=MO;BYDAY=MO,WE,FR;BYWEEKNO=10,20;BYMONTHDAY=5,15,25;BYYEARDAY=100,200'))
   assert.ok(!event.includes('BYWEEKNO10,20'))
   assert.ok(!event.includes('BYYEARDAY100,200'))
 
   const vtodo = new VTodo({
     uid: '2345678901',
-    due: new Date(),
+    due: Temporal.Now.instant(),
     summary: 'Task summary',
     description: 'Task description',
     priority: 1,
@@ -220,7 +217,7 @@ test('icalendar', () => {
 test('RRULE omits empty BY parts and remains parseable', () => {
   const event = new VEvent({
     uid: 'monthly@example.com',
-    start: new Date('2026-07-10T10:00:00Z'),
+    start: Temporal.Instant.from('2026-07-10T10:00:00Z'),
     rrule: {
       freq: 'MONTHLY',
       interval: 1,
@@ -243,7 +240,7 @@ test('RRULE omits empty BY parts and remains parseable', () => {
 test('RRULE serializes scalar and array BY values, including zero', () => {
   const yearly = new VEvent({
     uid: 'yearly@example.com',
-    start: new Date('2026-07-10T10:00:00Z'),
+    start: Temporal.Instant.from('2026-07-10T10:00:00Z'),
     rrule: {
       freq: 'YEARLY',
       bymonth: [1, 7],
@@ -252,7 +249,7 @@ test('RRULE serializes scalar and array BY values, including zero', () => {
   })
   const daily = new VEvent({
     uid: 'daily@example.com',
-    start: new Date('2026-07-10T10:00:00Z'),
+    start: Temporal.Instant.from('2026-07-10T10:00:00Z'),
     rrule: {
       freq: 'DAILY',
       bymonth: 7,
@@ -262,7 +259,7 @@ test('RRULE serializes scalar and array BY values, including zero', () => {
   })
   const dailyLists = new VEvent({
     uid: 'daily-lists@example.com',
-    start: new Date('2026-07-10T10:00:00Z'),
+    start: Temporal.Instant.from('2026-07-10T10:00:00Z'),
     rrule: {
       freq: 'DAILY',
       bymonth: [1, 7],
@@ -303,16 +300,16 @@ test('RFC 5545: 75 octets', () => {
 
   const asciiSummary = 'A'.repeat(80)
   const eventAscii = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     summary: asciiSummary,
   })
   assertMaxLineLength(eventAscii.ics, 'ASCII summary')
 
   const cyrillicSummary = 'Событие'.repeat(10)
   const eventCyrillic = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     summary: cyrillicSummary,
   })
   assertMaxLineLength(eventCyrillic.ics, 'Cyrillic summary')
@@ -321,8 +318,8 @@ test('RFC 5545: 75 octets', () => {
   const longDescription = 'Дорогие коллеги!\\nМы рады сообщить о запуске новой инициативы – Random, ' +
     'которая состоится 10 ноября.\\nЭто отличный способ познакомиться и пообщаться с коллегами.'
   const eventWithDesc = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     summary: 'Test',
     description: longDescription,
   })
@@ -349,8 +346,8 @@ test('RFC 5545: 75 octets', () => {
   assertMaxLineLength(journalWithLongSummary.ics, 'VJournal Cyrillic summary+description')
 
   const shortEvent = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     summary: 'Short',
     description: 'Brief',
   })
@@ -362,8 +359,8 @@ test('RFC 5545: 75 octets', () => {
 
 test('attendee supports string and address list', () => {
   const eventWithStringAttendee = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     attendee: 'CN=John Smith:mailto:john.smith@example.com',
   })
 
@@ -371,8 +368,8 @@ test('attendee supports string and address list', () => {
   assert.ok(!eventWithStringAttendee.ics.includes('ORGANIZER:CN=John Smith:mailto:john.smith@example.com'))
 
   const eventWithAddressListAttendee = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     attendee: [{
       name: 'John Smith',
       uri: 'mailto:john.smith@example.com',
@@ -391,9 +388,9 @@ test('attendee supports string and address list', () => {
 test('VFreeBusy', () => {
   const freeBusy = new VFreeBusy({
     uid: '98765@example.com',
-    stamp: new Date('2025-01-29T12:00:00Z'),
-    start: new Date('2025-02-01T00:00:00Z'),
-    end: new Date('2025-02-03T00:00:00Z'),
+    stamp: Temporal.Instant.from('2025-01-29T12:00:00Z'),
+    start: Temporal.Instant.from('2025-02-01T00:00:00Z'),
+    end: Temporal.Instant.from('2025-02-03T00:00:00Z'),
     organizer: 'mailto:user@example.com',
     attendee: [{
       name: 'Resource One',
@@ -407,16 +404,16 @@ test('VFreeBusy', () => {
     url: new URL('https://example.com/free-busy'),
     freeBusy: [
       {
-        start: new Date('2025-02-01T09:00:00Z'),
-        end: new Date('2025-02-01T11:00:00Z'),
+        start: Temporal.Instant.from('2025-02-01T09:00:00Z'),
+        end: Temporal.Instant.from('2025-02-01T11:00:00Z'),
       },
       {
-        start: new Date('2025-02-01T13:00:00Z'),
-        end: new Date('2025-02-01T14:00:00Z'),
+        start: Temporal.Instant.from('2025-02-01T13:00:00Z'),
+        end: Temporal.Instant.from('2025-02-01T14:00:00Z'),
         type: 'BUSY-TENTATIVE',
       },
       {
-        start: new Date('2025-02-01T15:00:00Z'),
+        start: Temporal.Instant.from('2025-02-01T15:00:00Z'),
         duration: 'PT1H',
         type: 'BUSY',
       },
@@ -455,20 +452,18 @@ test('VFreeBusy', () => {
 test('VAvailable', () => {
   const available = new VAvailable({
     uid: 'work-hours@example.com',
-    stamp: new Date('2026-06-29T12:00:00Z'),
-    start: new Date('2026-07-06T09:00:00Z'),
-    startTz: 'Europe/Berlin',
-    end: new Date('2026-07-06T17:00:00Z'),
-    endTz: 'Europe/Berlin',
+    stamp: Temporal.Instant.from('2026-06-29T12:00:00Z'),
+    start: Temporal.Instant.from('2026-07-06T09:00:00Z').toZonedDateTimeISO('Europe/Berlin'),
+    end: Temporal.Instant.from('2026-07-06T17:00:00Z').toZonedDateTimeISO('Europe/Berlin'),
     summary: 'Monday to Friday, 09:00-17:00',
     rrule: {
       freq: 'WEEKLY',
       byday: [Day.mo, Day.tu, Day.we, Day.th, Day.fr],
     },
-    rdate: [new Date('2026-07-12T09:00:00Z')],
+    rdate: [Temporal.Instant.from('2026-07-12T09:00:00Z')],
     exdate: [
-      new Date('2026-07-10T09:00:00Z'),
-      new Date('2026-07-11T09:00:00Z'),
+      Temporal.Instant.from('2026-07-10T09:00:00Z'),
+      Temporal.Instant.from('2026-07-11T09:00:00Z'),
     ],
   })
 
@@ -488,14 +483,14 @@ test('VAvailable', () => {
 test('VAvailability', () => {
   const available = new VAvailable({
     uid: 'doctor-mon-thu@example.com',
-    stamp: new Date('2026-06-29T12:00:00Z'),
-    start: new Date('2026-07-06T10:00:00Z'),
-    end: new Date('2026-07-06T18:00:00Z'),
+    stamp: Temporal.Instant.from('2026-06-29T12:00:00Z'),
+    start: Temporal.Instant.from('2026-07-06T10:00:00Z'),
+    end: Temporal.Instant.from('2026-07-06T18:00:00Z'),
     summary: 'Monday to Thursday',
   })
   const availability = new VAvailability({
     uid: 'doctor-availability@example.com',
-    stamp: new Date('2026-06-29T12:00:00Z'),
+    stamp: Temporal.Instant.from('2026-06-29T12:00:00Z'),
     busyType: 'BUSY-UNAVAILABLE',
     priority: 0,
     summary: 'Doctor working hours',
@@ -524,24 +519,24 @@ test('VAvailability', () => {
 test('ICalendar integrates VAVAILABILITY', () => {
   const timezone = new VTimezone({ tzid: 'UTC' })
   timezone.addStandard({
-    start: new Date('2026-01-01T00:00:00Z'),
+    start: Temporal.PlainDateTime.from('2026-01-01T00:00:00'),
     tzOffsetFrom: '+0000',
     tzOffsetTo: '+0000',
     tzname: 'UTC',
   })
   const availability = new VAvailability({
     uid: 'availability@example.com',
-    stamp: new Date('2026-06-29T12:00:00Z'),
+    stamp: Temporal.Instant.from('2026-06-29T12:00:00Z'),
   })
   availability.addAvailable(new VAvailable({
     uid: 'available@example.com',
-    stamp: new Date('2026-06-29T12:00:00Z'),
-    start: new Date('2026-07-06T09:00:00Z'),
-    end: new Date('2026-07-06T17:00:00Z'),
+    stamp: Temporal.Instant.from('2026-06-29T12:00:00Z'),
+    start: Temporal.Instant.from('2026-07-06T09:00:00Z'),
+    end: Temporal.Instant.from('2026-07-06T17:00:00Z'),
   }))
   const event = new VEvent({
-    start: new Date('2026-07-06T18:00:00Z'),
-    end: new Date('2026-07-06T19:00:00Z'),
+    start: Temporal.Instant.from('2026-07-06T18:00:00Z'),
+    end: Temporal.Instant.from('2026-07-06T19:00:00Z'),
   })
   const calendar = new ICalendar({ id: '-//example.com//availability//EN' })
 
@@ -564,15 +559,9 @@ test('ICalendar integrates VAVAILABILITY', () => {
 })
 
 test('VAvailability and VAvailable validate invalid input', () => {
-  assert.throws(() => new VAvailable({} as never), /start must be a Date object/)
-  assert.throws(() => new VAvailable({ start: '2026-07-06' as never }), /start must be a Date object/)
   assert.throws(() => new VAvailable({
-    start: new Date('2026-07-06T09:00:00Z'),
-    end: '2026-07-06' as never,
-  }), /end must be a Date object/)
-  assert.throws(() => new VAvailable({
-    start: new Date('2026-07-06T09:00:00Z'),
-    end: new Date('2026-07-06T17:00:00Z'),
+    start: Temporal.Instant.from('2026-07-06T09:00:00Z'),
+    end: Temporal.Instant.from('2026-07-06T17:00:00Z'),
     duration: 'PT8H',
   }), /end and duration must not be used together/)
   assert.throws(() => new VAvailability({
@@ -591,8 +580,8 @@ test('VAvailability and VAvailable escape and fold text values', () => {
   const longText = 'Doctor availability, with semicolon; '.repeat(8)
   const available = new VAvailable({
     uid: 'available-text@example.com',
-    stamp: new Date('2026-06-29T12:00:00Z'),
-    start: new Date('2026-07-06T09:00:00Z'),
+    stamp: Temporal.Instant.from('2026-06-29T12:00:00Z'),
+    start: Temporal.Instant.from('2026-07-06T09:00:00Z'),
     duration: 'PT8H',
     summary: longText,
     description: 'Line 1\nLine 2, with semicolon; and slash \\',
@@ -604,7 +593,7 @@ test('VAvailability and VAvailable escape and fold text values', () => {
   })
   const availability = new VAvailability({
     uid: 'availability-text@example.com',
-    stamp: new Date('2026-06-29T12:00:00Z'),
+    stamp: Temporal.Instant.from('2026-06-29T12:00:00Z'),
     summary: longText,
   })
   availability.addAvailable(available)
@@ -621,8 +610,8 @@ test('VAvailability and VAvailable escape and fold text values', () => {
 test('VFreeBusy generates UID and DTSTAMP', () => {
   const freeBusy = new VFreeBusy({
     freeBusy: [{
-      start: new Date('2025-02-01T09:00:00Z'),
-      end: new Date('2025-02-01T11:00:00Z'),
+      start: Temporal.Instant.from('2025-02-01T09:00:00Z'),
+      end: Temporal.Instant.from('2025-02-01T11:00:00Z'),
     }],
   })
 
@@ -634,7 +623,7 @@ test('VFreeBusy supports all FBTYPE values', () => {
   for (const type of ['FREE', 'BUSY', 'BUSY-TENTATIVE', 'BUSY-UNAVAILABLE'] as const) {
     const freeBusy = new VFreeBusy({
       freeBusy: [{
-        start: new Date('2025-02-01T09:00:00Z'),
+        start: Temporal.Instant.from('2025-02-01T09:00:00Z'),
         duration: 'PT1H',
         type,
       }],
@@ -646,33 +635,28 @@ test('VFreeBusy supports all FBTYPE values', () => {
 
 test('VFreeBusy validates invalid input', () => {
   const validPeriod = {
-    start: new Date('2025-02-01T09:00:00Z'),
-    end: new Date('2025-02-01T11:00:00Z'),
+    start: Temporal.Instant.from('2025-02-01T09:00:00Z'),
+    end: Temporal.Instant.from('2025-02-01T11:00:00Z'),
   }
 
   assert.throws(() => new VFreeBusy({} as never), /freeBusy must contain at least one period/)
   assert.throws(() => new VFreeBusy({ freeBusy: [] }), /freeBusy must contain at least one period/)
-  assert.throws(() => new VFreeBusy({ start: '2025-02-01' as never, freeBusy: [validPeriod] }), /start must be a Date object/)
-  assert.throws(() => new VFreeBusy({ end: '2025-02-01' as never, freeBusy: [validPeriod] }), /end must be a Date object/)
   assert.throws(() => new VFreeBusy({
-    start: new Date('2025-02-02T00:00:00Z'),
-    end: new Date('2025-02-01T00:00:00Z'),
+    start: Temporal.Instant.from('2025-02-02T00:00:00Z'),
+    end: Temporal.Instant.from('2025-02-01T00:00:00Z'),
     freeBusy: [validPeriod],
   }), /end must be after start/)
-  assert.throws(() => new VFreeBusy({ freeBusy: [{ end: new Date() } as never] }), /freeBusy period start must be a Date object/)
-  assert.throws(() => new VFreeBusy({ freeBusy: [{ start: '2025-02-01' as never, end: new Date() }] }), /freeBusy period start must be a Date object/)
-  assert.throws(() => new VFreeBusy({ freeBusy: [{ start: new Date() }] }), /freeBusy period must include either end or duration/)
+  assert.throws(() => new VFreeBusy({ freeBusy: [{ start: Temporal.Now.instant() }] }), /freeBusy period must include either end or duration/)
   assert.throws(() => new VFreeBusy({ freeBusy: [{ ...validPeriod, duration: 'PT1H' }] }), /freeBusy period must not include both end and duration/)
-  assert.throws(() => new VFreeBusy({ freeBusy: [{ start: new Date(), end: '2025-02-01' as never }] }), /freeBusy period end must be a Date object/)
   assert.throws(() => new VFreeBusy({
     freeBusy: [{
-      start: new Date('2025-02-01T11:00:00Z'),
-      end: new Date('2025-02-01T09:00:00Z'),
+      start: Temporal.Instant.from('2025-02-01T11:00:00Z'),
+      end: Temporal.Instant.from('2025-02-01T09:00:00Z'),
     }],
   }), /freeBusy period end must be after start/)
   assert.throws(() => new VFreeBusy({
     freeBusy: [{
-      start: new Date('2025-02-01T09:00:00Z'),
+      start: Temporal.Instant.from('2025-02-01T09:00:00Z'),
       duration: 'PT1H',
       type: 'BUSY-MAYBE' as never,
     }],
@@ -686,31 +670,31 @@ test('VFreeBusy validates invalid input', () => {
 test('ICalendar integrates VFREEBUSY as a top-level component', () => {
   const timezone = new VTimezone({ tzid: 'UTC' })
   timezone.addStandard({
-    start: new Date('2025-01-01T00:00:00Z'),
+    start: Temporal.PlainDateTime.from('2025-01-01T00:00:00'),
     tzOffsetFrom: '+0000',
     tzOffsetTo: '+0000',
     tzname: 'UTC',
   })
   const freeBusyA = new VFreeBusy({
     uid: 'fb-a',
-    stamp: new Date('2025-01-29T12:00:00Z'),
+    stamp: Temporal.Instant.from('2025-01-29T12:00:00Z'),
     freeBusy: [{
-      start: new Date('2025-02-01T09:00:00Z'),
-      end: new Date('2025-02-01T11:00:00Z'),
+      start: Temporal.Instant.from('2025-02-01T09:00:00Z'),
+      end: Temporal.Instant.from('2025-02-01T11:00:00Z'),
     }],
   })
   const freeBusyB = new VFreeBusy({
     uid: 'fb-b',
-    stamp: new Date('2025-01-29T12:00:00Z'),
+    stamp: Temporal.Instant.from('2025-01-29T12:00:00Z'),
     freeBusy: [{
-      start: new Date('2025-02-02T09:00:00Z'),
+      start: Temporal.Instant.from('2025-02-02T09:00:00Z'),
       duration: 'PT1H',
       type: 'FREE',
     }],
   })
   const event = new VEvent({
-    start: new Date('2025-02-01T09:00:00Z'),
-    end: new Date('2025-02-01T10:00:00Z'),
+    start: Temporal.Instant.from('2025-02-01T09:00:00Z'),
+    end: Temporal.Instant.from('2025-02-01T10:00:00Z'),
   })
   const todo = new VTodo({ summary: 'Task' })
   const journal = new VJournal({ summary: 'Journal' })
@@ -742,7 +726,7 @@ test('ICalendar integrates VFREEBUSY as a top-level component', () => {
 
 test('event supports optional end and zero values', () => {
   const event = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
     priority: 0,
     sequence: 0,
   })
@@ -753,25 +737,21 @@ test('event supports optional end and zero values', () => {
   assert.ok(event.ics.includes('SEQUENCE:0'))
 
   assert.throws(() => new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T09:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T09:00:00Z'),
   }), /end must be after start/)
 })
 
 test('ICalendar automatically adds unique VTIMEZONE blocks used by events', () => {
   const calendar = new ICalendar()
   calendar.addEvent(new VEvent({
-    start: new Date('2026-07-10T10:00:00Z'),
-    startTz: 'Europe/Moscow',
-    end: new Date('2026-07-10T11:00:00Z'),
-    endTz: 'Europe/Moscow',
+    start: Temporal.Instant.from('2026-07-10T10:00:00Z').toZonedDateTimeISO('Europe/Moscow'),
+    end: Temporal.Instant.from('2026-07-10T11:00:00Z').toZonedDateTimeISO('Europe/Moscow'),
     location: 'America/New_York',
   }))
   calendar.addEvent(new VEvent({
-    start: new Date('2026-07-11T10:00:00Z'),
-    startTz: 'Europe/Moscow',
-    end: new Date('2026-07-11T11:00:00Z'),
-    endTz: 'America/New_York',
+    start: Temporal.Instant.from('2026-07-11T10:00:00Z').toZonedDateTimeISO('Europe/Moscow'),
+    end: Temporal.Instant.from('2026-07-11T11:00:00Z').toZonedDateTimeISO('America/New_York'),
   }))
 
   const ics = calendar.ics
@@ -783,10 +763,8 @@ test('ICalendar automatically adds unique VTIMEZONE blocks used by events', () =
 
 test('event converts absolute dates to the selected IANA timezone', () => {
   const event = new VEvent({
-    start: new Date('2024-07-31T11:00:00Z'),
-    startTz: 'Europe/Moscow',
-    end: new Date('2024-07-31T12:00:00Z'),
-    endTz: 'Europe/Moscow',
+    start: Temporal.Instant.from('2024-07-31T11:00:00Z').toZonedDateTimeISO('Europe/Moscow'),
+    end: Temporal.Instant.from('2024-07-31T12:00:00Z').toZonedDateTimeISO('Europe/Moscow'),
   })
 
   assert.ok(event.ics.includes('DTSTART;TZID=Europe/Moscow:20240731T140000'))
@@ -795,8 +773,8 @@ test('event converts absolute dates to the selected IANA timezone', () => {
 
 test('event keeps UTC serialization when no timezone is selected', () => {
   const event = new VEvent({
-    start: new Date('2024-07-31T11:00:00Z'),
-    end: new Date('2024-07-31T12:00:00Z'),
+    start: Temporal.Instant.from('2024-07-31T11:00:00Z'),
+    end: Temporal.Instant.from('2024-07-31T12:00:00Z'),
   })
 
   assert.ok(event.ics.includes('DTSTART:20240731T110000Z'))
@@ -806,7 +784,7 @@ test('event keeps UTC serialization when no timezone is selected', () => {
 test('manual VTimezone takes priority over the automatic block', () => {
   const timezone = new VTimezone({ tzid: 'Europe/Moscow' })
   timezone.addStandard({
-    start: new Date('1970-01-01T00:00:00Z'),
+    start: Temporal.PlainDateTime.from('1970-01-01T00:00:00'),
     tzOffsetFrom: '+0300',
     tzOffsetTo: '+0300',
     tzname: 'CUSTOM-MSK',
@@ -814,8 +792,7 @@ test('manual VTimezone takes priority over the automatic block', () => {
   const calendar = new ICalendar()
   calendar.addTimezone(timezone)
   calendar.addEvent(new VEvent({
-    start: new Date('2026-07-10T10:00:00Z'),
-    startTz: 'Europe/Moscow',
+    start: Temporal.Instant.from('2026-07-10T10:00:00Z').toZonedDateTimeISO('Europe/Moscow'),
   }))
 
   const ics = calendar.ics
@@ -826,8 +803,8 @@ test('manual VTimezone takes priority over the automatic block', () => {
 
 test('manual timezone observances serialize local DTSTART without Z or TZID', () => {
   const timezone = new VTimezone({ tzid: 'America/New_York' })
-  timezone.addStandard({ start: new Date('2026-11-01T02:00:00Z'), tzOffsetFrom: '-0400', tzOffsetTo: '-0500', tzname: 'EST' })
-  timezone.addDaylight({ start: new Date('2026-03-08T02:00:00Z'), tzOffsetFrom: '-0500', tzOffsetTo: '-0400', tzname: 'EDT' })
+  timezone.addStandard({ start: Temporal.PlainDateTime.from('2026-11-01T02:00:00'), tzOffsetFrom: '-0400', tzOffsetTo: '-0500', tzname: 'EST' })
+  timezone.addDaylight({ start: Temporal.PlainDateTime.from('2026-03-08T02:00:00'), tzOffsetFrom: '-0500', tzOffsetTo: '-0400', tzname: 'EDT' })
   const parsed = new ICAL.Component(ICAL.parse(timezone.ics))
   for (const [kind, expected] of [['standard', '20261101T020000'], ['daylight', '20260308T020000']]) {
     const observance = parsed.getFirstSubcomponent(kind)!
@@ -838,15 +815,13 @@ test('manual timezone observances serialize local DTSTART without Z or TZID', ()
   }
 })
 
-test('event rejects invalid dates and an end at or before start', () => {
-  const start = new Date('2026-09-30T10:00:00Z')
-  assert.throws(() => new VEvent({ start: new Date('invalid') }), /start must be a valid Date/)
-  assert.throws(() => new VEvent({ start, end: new Date('invalid') }), /end must be a valid Date/)
-  for (const end of [new Date(start), new Date(start.getTime() - 1000)]) {
+test('event rejects an end at or before start', () => {
+  const start = Temporal.Instant.from('2026-09-30T10:00:00Z')
+  for (const end of [start, start.subtract({ seconds: 1 })]) {
     assert.throws(() => new VEvent({ start, end }), /end must be after start/)
   }
   assert.doesNotThrow(() => new VEvent({ start }))
-  const event = new VEvent({ start, end: new Date(start.getTime() + 3600000), startTz: 'Europe/Moscow', endTz: 'America/New_York' })
+  const event = new VEvent({ start: start.toZonedDateTimeISO('Europe/Moscow'), end: start.add({ hours: 1 }).toZonedDateTimeISO('America/New_York') })
   const parsed = new ICAL.Component(ICAL.parse(event.ics))
   assert.ok(parsed.getFirstProperty('dtstart'))
   assert.ok(parsed.getFirstProperty('dtend'))
@@ -855,7 +830,7 @@ test('event rejects invalid dates and an end at or before start', () => {
 test('event location does not add a VTIMEZONE block', () => {
   const calendar = new ICalendar()
   calendar.addEvent(new VEvent({
-    start: new Date('2026-07-10T10:00:00Z'),
+    start: Temporal.Instant.from('2026-07-10T10:00:00Z'),
     location: 'Europe/Moscow',
   }))
 
@@ -867,7 +842,7 @@ test('address names preserve parameter delimiters, quotes, carets and newlines',
   for (const name of names) {
     const address = { name, uri: 'jane@example.com' }
     for (const value of [address, [address]]) {
-      const event = new VEvent({ start: new Date('2026-09-30T10:00:00Z'), attendee: value, organizer: value })
+      const event = new VEvent({ start: Temporal.Instant.from('2026-09-30T10:00:00Z'), attendee: value, organizer: value })
       const parsed = new ICAL.Component(ICAL.parse(event.ics))
       for (const property of ['attendee', 'organizer']) {
         const properties = parsed.getAllProperties(property)
@@ -885,8 +860,8 @@ test('address names preserve parameter delimiters, quotes, carets and newlines',
 
 test('text values are escaped', () => {
   const event = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     summary: 'Meeting, planning; Q\\A',
     location: 'Room 1, Floor 2',
     categories: ['team,calendar', 'planning;review'],
@@ -902,7 +877,7 @@ test('text values are escaped', () => {
 test('TEXT serialization preserves literal backslash sequences', () => {
   const text = String.raw`a\,b\;c\nd\Ne\\f C:\new\notes` + '\nnext'
   for (const Component of [VEvent, VTodo, VJournal]) {
-    const component = new Component({ start: new Date('2026-09-30T10:00:00Z'), summary: text, description: text })
+    const component = new Component({ start: Temporal.Instant.from('2026-09-30T10:00:00Z'), summary: text, description: text })
     const parsed = new ICAL.Component(ICAL.parse(component.ics))
     assert.equal(parsed.getFirstPropertyValue('summary'), text)
     assert.equal(parsed.getFirstPropertyValue('description'), text)
@@ -911,8 +886,8 @@ test('TEXT serialization preserves literal backslash sequences', () => {
 
 test('attachments support data urls and uri values', () => {
   const eventWithDataUrl = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     attach: 'data:text/plain;base64,SGVsbG8=',
   })
 
@@ -921,16 +896,16 @@ test('attachments support data urls and uri values', () => {
   assert.ok(eventWithDataUrl.ics.includes(':SGVsbG8='))
 
   const eventWithUppercaseBase64DataUrl = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     attach: 'data:text/plain;BASE64,SGVsbG8=',
   })
 
   assert.ok(eventWithUppercaseBase64DataUrl.ics.includes(';ENCODING=BASE64;VALUE=BINARY'))
 
   const eventWithUri = new VEvent({
-    start: new Date('2024-06-01T09:00:00Z'),
-    end: new Date('2024-06-01T10:00:00Z'),
+    start: Temporal.Instant.from('2024-06-01T09:00:00Z'),
+    end: Temporal.Instant.from('2024-06-01T10:00:00Z'),
     attach: 'https://example.com/file.txt',
   })
 
@@ -940,8 +915,8 @@ test('attachments support data urls and uri values', () => {
 test('RFC 5545: text newlines are escaped', () => {
   const description = 'Qweqweqwe\r\nqwe\nqwe\rqwe'
   const event = new VEvent({
-    start: new Date('2026-06-12T14:35:00Z'),
-    end: new Date('2026-06-12T15:05:00Z'),
+    start: Temporal.Instant.from('2026-06-12T14:35:00Z'),
+    end: Temporal.Instant.from('2026-06-12T15:05:00Z'),
     summary: '222',
     description,
   })
@@ -1133,7 +1108,7 @@ test('VALARM serializes RFC 5545 alarm properties', () => {
 
   const todo = new VTodo({
     uid: 'todo-with-alarm',
-    due: new Date('2024-06-01T09:00:00Z'),
+    due: Temporal.Instant.from('2024-06-01T09:00:00Z'),
     summary: 'Task with reminder',
   })
   todo.addAlarm(new VAlarm({
@@ -1143,4 +1118,281 @@ test('VALARM serializes RFC 5545 alarm properties', () => {
   }))
   assert.ok(todo.ics.includes('BEGIN:VALARM'))
   assert.ok(todo.ics.includes('END:VALARM'))
+})
+
+test('PlainDate events use exclusive DATE boundaries and support a one-day default', () => {
+  const start = Temporal.PlainDate.from('2026-12-31')
+  const event = new VEvent({ uid: 'all-day', start, end: start.add({ days: 2 }) })
+  assert.ok(event.ics.includes('DTSTART;VALUE=DATE:20261231'))
+  assert.ok(event.ics.includes('DTEND;VALUE=DATE:20270102'))
+  const parsed = new ICAL.Component(ICAL.parse(event.ics))
+  assert.equal((parsed.getFirstPropertyValue('dtstart') as ICAL.Time).isDate, true)
+  assert.equal((parsed.getFirstPropertyValue('dtend') as ICAL.Time).toString(), '2027-01-02')
+  const single = new VEvent({ uid: 'one-day', start })
+  assert.ok(!single.ics.includes('DTEND'))
+  assert.deepEqual(single.timezones, [])
+  for (const end of [start, start.subtract({ days: 1 })]) {
+    assert.throws(() => new VEvent({ uid: 'invalid', start, end }), /end must be after start/)
+  }
+  assert.throws(() => new VEvent({ uid: 'invalid', start, end: Temporal.Instant.from('2027-01-02T00:00Z') }), /both be dates/)
+})
+
+test('Temporal events preserve elapsed time across spring and autumn DST', () => {
+  const zone = 'Europe/Berlin'
+  const spring = new VEvent({
+    uid: 'spring',
+    start: Temporal.ZonedDateTime.from('2026-03-29T01:30+01:00[Europe/Berlin]'),
+    end: Temporal.ZonedDateTime.from('2026-03-29T03:30+02:00[Europe/Berlin]'),
+  })
+  assert.ok(spring.ics.includes('DTSTART;TZID=Europe/Berlin:20260329T013000'))
+  assert.ok(spring.ics.includes('DTEND;TZID=Europe/Berlin:20260329T033000'))
+  const autumn = new VEvent({
+    uid: 'autumn',
+    start: Temporal.ZonedDateTime.from('2026-10-25T01:30+02:00[Europe/Berlin]'),
+    end: Temporal.ZonedDateTime.from('2026-10-25T03:30+01:00[Europe/Berlin]'),
+  })
+  assert.ok(autumn.ics.includes('DTSTART;TZID=Europe/Berlin:20261025T013000'))
+  assert.ok(autumn.ics.includes('DTEND;TZID=Europe/Berlin:20261025T033000'))
+  const calendar = new ICalendar()
+  calendar.addEvent(spring)
+  calendar.addEvent(autumn)
+  const parsed = new ICAL.Component(ICAL.parse(calendar.ics))
+  const timezone = new ICAL.Timezone({ component: parsed.getFirstSubcomponent('vtimezone')! })
+  ICAL.TimezoneService.register(zone, timezone)
+  try {
+    for (const event of parsed.getAllSubcomponents('vevent')) {
+      const start = event.getFirstPropertyValue('dtstart') as ICAL.Time
+      const end = event.getFirstPropertyValue('dtend') as ICAL.Time
+      assert.equal(end.toUnixTime() - start.toUnixTime(), event.getFirstPropertyValue('uid') === 'spring' ? 3600 : 10800)
+    }
+  } finally {
+    ICAL.TimezoneService.remove(zone)
+  }
+})
+
+test('VEvent serializes all-day UNTIL, RDATE and EXDATE with date values', () => {
+  const start = Temporal.PlainDate.from('2026-09-30')
+  const event = new VEvent({
+    uid: 'recurrence', start,
+    rrule: { freq: 'DAILY', until: start.add({ days: 10 }) },
+    rdate: [start.add({ days: 12 }), start.add({ days: 13 })],
+    exdate: [start, start.add({ days: 3 })],
+  })
+  assert.ok(event.ics.includes('UNTIL=20261010'))
+  assert.ok(event.ics.includes('RDATE;VALUE=DATE:20261012,20261013'))
+  assert.ok(event.ics.includes('EXDATE;VALUE=DATE:20260930,20261003'))
+  const parsed = new ICAL.Component(ICAL.parse(event.ics))
+  assert.equal((parsed.getFirstPropertyValue('rrule') as ICAL.Recur).until!.isDate, true)
+  assert.ok(parsed.getFirstProperty('rdate')!.getValues().every((value: ICAL.Time) => value.isDate))
+  assert.ok(parsed.getFirstProperty('exdate')!.getValues().every((value: ICAL.Time) => value.isDate))
+})
+
+test('VEvent recurrence lists preserve exact zoned moments and fold long lists', () => {
+  const start = Temporal.ZonedDateTime.from('2026-10-24T02:30+02:00[Europe/Berlin]')
+  const dates = Array.from({ length: 20 }, (_, days) => start.add({ days }))
+  const event = new VEvent({
+    uid: 'timed-recurrence', start,
+    rrule: { freq: 'DAILY', until: dates.at(-1) },
+    rdate: dates,
+    exdate: [Temporal.ZonedDateTime.from('2026-10-25T02:30+01:00[Europe/Berlin]')],
+  })
+  assert.ok(event.ics.includes('EXDATE:20261025T013000Z'))
+  assert.ok(event.ics.includes('\r\n '))
+  for (const line of event.ics.split('\r\n')) assert.ok(Buffer.byteLength(line) <= 75)
+  const parsed = new ICAL.Component(ICAL.parse(event.ics))
+  assert.equal(parsed.getFirstProperty('rdate')!.getValues().length, dates.length)
+  parsed.getFirstProperty('rdate')!.getValues().forEach((value: ICAL.Time, i) => {
+    assert.equal(value.toUnixTime(), Number(dates[i].epochNanoseconds / 1_000_000_000n))
+  })
+  const standalone = new VEvent({ uid: 'no-rule', start, rdate: [dates[1]], exdate: [] })
+  assert.ok(standalone.ics.includes('RDATE:'))
+  assert.ok(!standalone.ics.includes('EXDATE:'))
+  assert.ok(!standalone.ics.includes('RRULE:'))
+  const empty = new VEvent({ uid: 'empty', start, rdate: [], exdate: [] })
+  assert.ok(!empty.ics.includes('RDATE:'))
+})
+
+test('recurrence lists reject incompatible Temporal types', () => {
+  const start = Temporal.PlainDate.from('2026-09-30')
+  const moment = Temporal.Instant.from('2026-09-30T10:00Z')
+  for (const field of ['rdate', 'exdate']) {
+    assert.throws(() => new VEvent({ uid: 'invalid', start, [field]: [moment] }), /same value type/)
+    assert.throws(() => new VEvent({ uid: 'invalid', start: moment, [field]: [start] }), /same value type/)
+  }
+})
+
+test('Temporal components preserve DATE semantics and fixed-offset moments', () => {
+  const date = Temporal.PlainDate.from('2026-09-30')
+  assert.ok(new VTodo({ uid: 'todo', due: date }).ics.includes('DUE;VALUE=DATE:20260930'))
+  assert.ok(new VJournal({ uid: 'journal', start: date }).ics.includes('DTSTART;VALUE=DATE:20260930'))
+  const fixed = new VEvent({ uid: 'fixed-offset', start: Temporal.ZonedDateTime.from('2026-09-30T10:00+03:00[+03:00]') })
+  assert.ok(fixed.ics.includes('DTSTART:20260930T070000Z'))
+  assert.deepEqual(fixed.timezones, [])
+})
+
+test('Temporal formatting uses ISO dates and truncates fractional seconds before the Unix epoch', () => {
+  const date = Temporal.PlainDate.from('1999-01-02').withCalendar('hebrew')
+  const allDay = new VEvent({ start: date, end: Temporal.PlainDate.from('1999-01-03').withCalendar('hebrew') })
+  assert.ok(allDay.ics.includes('DTSTART;VALUE=DATE:19990102'))
+  assert.ok(allDay.ics.includes('DTEND;VALUE=DATE:19990103'))
+
+  const start = Temporal.Instant.from('1969-12-31T23:59:59.999999999Z')
+  const event = new VEvent({ start, end: start.add({ seconds: 1 }), stamp: start })
+  assert.ok(event.ics.includes('DTSTAMP:19691231T235959Z'))
+  assert.ok(event.ics.includes('DTSTART:19691231T235959Z'))
+  assert.ok(event.ics.includes('DTEND:19700101T000000Z'))
+})
+
+test('automatic timezone blocks include zoned todo, journal and availability boundaries', () => {
+  const start = Temporal.Instant.from('2026-09-30T10:00Z').toZonedDateTimeISO('Europe/Berlin')
+  const calendar = new ICalendar()
+  calendar.addTodo(new VTodo({ uid: 'todo', due: start }))
+  calendar.addJournal(new VJournal({ uid: 'journal', start }))
+  const availability = new VAvailability()
+  availability.addAvailable(new VAvailable({ start }))
+  calendar.addAvailability(availability)
+  assert.equal(calendar.ics.match(/BEGIN:VTIMEZONE/g)?.length, 1)
+  assert.doesNotThrow(() => ICAL.parse(calendar.ics))
+})
+
+
+test('moment boundaries must remain ordered at iCalendar second precision', () => {
+  const start = Temporal.Instant.from('2026-09-30T10:00:00.1Z')
+  const end = start.add({ milliseconds: 100 })
+  assert.throws(() => new VEvent({ uid: 'subseconds', start, end }), /end must be after start/)
+  assert.throws(() => new VFreeBusy({ freeBusy: [{ start, end }] }), /end must be after start/)
+})
+
+
+test('first repeated local time keeps TZID and daily recurrences at the same local hour', () => {
+  for (const [zone, iso] of [
+    ['Europe/Berlin', '2026-10-25T02:30+02:00[Europe/Berlin]'],
+    ['America/New_York', '2026-11-01T01:30-04:00[America/New_York]'],
+  ]) {
+    const start = Temporal.ZonedDateTime.from(iso)
+    const inputs = { uid: 'repeated', start, rrule: { freq: 'DAILY' as const, count: 3 } }
+    const calendar = new ICalendar()
+    calendar.addEvent(new VEvent(inputs))
+    const parsed = new ICAL.Component(ICAL.parse(calendar.ics))
+    const event = parsed.getFirstSubcomponent('vevent')!
+    assert.equal(event.getFirstProperty('dtstart')!.getParameter('tzid'), zone)
+    assert.deepEqual(new VEvent(inputs).timezones, [zone])
+    assert.equal(parsed.getAllSubcomponents('vtimezone').length, 1)
+    ICAL.TimezoneService.register(zone, new ICAL.Timezone({ component: parsed.getFirstSubcomponent('vtimezone')! }))
+    try {
+      const iterator = new ICAL.Event(event).iterator()
+      for (let i = 0; i < 3; i++) {
+        const occurrence = iterator.next()!
+        const expected = start.add({ days: i })
+        assert.equal(occurrence.toString(), expected.toPlainDateTime().toString())
+        // ical.js resolves the repeated first local time differently from RFC
+        // 5545. Verify its UTC conversion on subsequent, unambiguous days.
+        if (i > 0) assert.equal(occurrence.toUnixTime(), Number(expected.epochNanoseconds / 1_000_000_000n))
+      }
+      assert.equal(iterator.next(), undefined)
+    } finally {
+      ICAL.TimezoneService.remove(zone)
+    }
+    for (const Component of [VAvailable, VJournal]) {
+      assert.ok(new Component(inputs).ics.includes(`DTSTART;TZID=${zone}:`))
+    }
+    assert.ok(new VTodo({ uid: inputs.uid, due: start, rrule: inputs.rrule }).ics.includes(`DUE;TZID=${zone}:`))
+  }
+})
+
+test('second repeated local time stays exact for single events and is rejected for zoned recurrences', () => {
+  const start = Temporal.ZonedDateTime.from('2026-10-25T02:30+01:00[Europe/Berlin]')
+  const first = start.toInstant().subtract({ hours: 1 }).toZonedDateTimeISO('Europe/Berlin')
+  const crossing = new VEvent({ uid: 'repeated-hour', start: first, end: start })
+  assert.ok(crossing.ics.includes('DTSTART;TZID=Europe/Berlin:20261025T023000'))
+  assert.ok(crossing.ics.includes('DTEND:20261025T013000Z'))
+  const crossingParsed = new ICAL.Component(ICAL.parse(crossing.ics))
+  const local = (crossingParsed.getFirstPropertyValue('dtstart') as ICAL.Time).toString()
+  const emittedStart = Temporal.PlainDateTime.from(local).toZonedDateTime('Europe/Berlin', { disambiguation: 'earlier' })
+  const emittedEnd = Temporal.Instant.from((crossingParsed.getFirstPropertyValue('dtend') as ICAL.Time).toString())
+  assert.equal(emittedEnd.epochNanoseconds - emittedStart.epochNanoseconds, 3_600_000_000_000n)
+  const single = new VEvent({ uid: 'second-occurrence', start })
+  assert.ok(single.ics.includes('DTSTART:20261025T013000Z'))
+  assert.deepEqual(single.timezones, [])
+  for (const Component of [VEvent, VAvailable, VJournal]) {
+    assert.throws(() => new Component({ uid: 'second-occurrence', start, rrule: { freq: 'DAILY', count: 160 } }), /second occurrence/)
+  }
+  assert.throws(() => new VTodo({ uid: 'second-occurrence', due: start, rrule: { freq: 'DAILY' } }), /second occurrence/)
+  assert.ok(new VEvent({ uid: 'explicit-utc', start: start.toInstant(), rrule: { freq: 'DAILY', count: 3 } }).ics.includes('DTSTART:20261025T013000Z'))
+})
+
+test('zoned daily recurrence retains its local hour across the following spring transition', () => {
+  const calendar = new ICalendar()
+  calendar.addEvent(new VEvent({
+    uid: 'local-series',
+    start: Temporal.ZonedDateTime.from('2026-10-25T02:30+02:00[Europe/Berlin]'),
+    rrule: { freq: 'DAILY', until: Temporal.Instant.from('2027-03-30T00:00Z') },
+  }))
+  const parsed = new ICAL.Component(ICAL.parse(calendar.ics))
+  ICAL.TimezoneService.register(new ICAL.Timezone(parsed.getFirstSubcomponent('vtimezone')!))
+  try {
+    const iterator = new ICAL.Event(parsed.getFirstSubcomponent('vevent')!).iterator()
+    let found = false
+    for (let occurrence = iterator.next(); occurrence; occurrence = iterator.next()) {
+      if (occurrence.year === 2027 && occurrence.month === 3 && occurrence.day === 29) {
+        assert.equal(occurrence.hour, 2)
+        assert.equal(occurrence.minute, 30)
+        assert.equal(occurrence.toUnixTime(), Number(Temporal.Instant.from('2027-03-29T00:30Z').epochMilliseconds / 1000))
+        found = true
+      }
+    }
+    assert.ok(found)
+  } finally {
+    ICAL.TimezoneService.reset()
+  }
+})
+
+test('recurrence validation rejects incompatible UNTIL, conflicting limits and all-day time parts', () => {
+  const date = Temporal.PlainDate.from('2026-09-30')
+  const instant = Temporal.Instant.from('2026-09-30T10:00Z')
+  for (const Component of [VEvent, VJournal, VTodo]) {
+    assert.throws(() => new Component({ uid: 'invalid', start: date, due: date, rrule: { freq: 'DAILY', until: instant } }), /same value type/)
+    assert.throws(() => new Component({ uid: 'invalid', start: instant, due: instant, rrule: { freq: 'DAILY', until: date } }), /same value type/)
+    assert.throws(() => new Component({ uid: 'invalid', start: date, due: date, rrule: { freq: 'DAILY', count: 3, until: date } }), /COUNT and UNTIL/)
+    for (const part of ['byhour', 'byminute'] as const) {
+      for (const value of [0, 9, [0], [9, 12]]) {
+        assert.throws(() => new Component({ uid: 'invalid', start: date, due: date, rrule: { freq: 'DAILY', [part]: value } }), /must not be used with Temporal.PlainDate/)
+      }
+    }
+  }
+  assert.throws(() => new VAvailable({ start: instant, rrule: { freq: 'DAILY', until: date } }), /same value type/)
+  assert.throws(() => new VAvailable({ start: instant, rrule: { freq: 'DAILY', count: 3, until: instant } }), /COUNT and UNTIL/)
+})
+
+test('PlainDate recurrence omits empty hour and minute parts', () => {
+  const date = Temporal.PlainDate.from('2026-09-30')
+  for (const Component of [VEvent, VJournal, VTodo]) {
+    const component = new Component({
+      uid: 'all-day-empty-parts', start: date, due: date,
+      rrule: { freq: 'DAILY', count: 3, byhour: [], byminute: [] },
+    })
+    const parsed = new ICAL.Component(ICAL.parse(component.ics))
+    const rule = parsed.getFirstPropertyValue('rrule') as ICAL.Recur
+    assert.equal(rule.freq, 'DAILY')
+    assert.equal(rule.count, 3)
+    assert.ok(!component.ics.includes('BYHOUR'))
+    assert.ok(!component.ics.includes('BYMINUTE'))
+  }
+})
+
+test('timed recurrence keeps scalar and array hour and minute parts', () => {
+  const instant = Temporal.Instant.from('2026-09-30T00:00Z')
+  for (const start of [instant, instant.toZonedDateTimeISO('Europe/Berlin')]) {
+    for (const Component of [VEvent, VJournal, VTodo]) {
+      for (const value of [0, [0, 9]]) {
+        const component = new Component({
+          uid: 'timed-time-parts', start, due: start,
+          rrule: { freq: 'DAILY', byhour: value, byminute: value },
+        })
+        const rule = new ICAL.Component(ICAL.parse(component.ics)).getFirstPropertyValue('rrule') as ICAL.Recur
+        assert.deepEqual(rule.parts.BYHOUR, Array.isArray(value) ? value : [value])
+        assert.deepEqual(rule.parts.BYMINUTE, Array.isArray(value) ? value : [value])
+      }
+    }
+  }
 })
